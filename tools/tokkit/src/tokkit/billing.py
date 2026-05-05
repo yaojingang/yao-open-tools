@@ -9,7 +9,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
-from .pricing import PriceBookResolution, estimate_cost_usd
+from .pricing import PriceBookResolution, coerce_optional_bool, estimate_cost_usd
 from .utils import resolve_app_home
 
 
@@ -123,6 +123,7 @@ class BillingCostAllocator:
                 measurement_method,
                 COALESCE(model, '') AS model,
                 COALESCE(json_extract(metadata_json, '$.model_provider'), '') AS model_provider,
+                MAX(json_extract(metadata_json, '$.cached_input_is_separate')) AS cached_input_is_separate,
                 SUM(input_tokens) AS input_tokens,
                 SUM(output_tokens) AS output_tokens,
                 SUM(cached_input_tokens) AS cached_input_tokens,
@@ -149,6 +150,7 @@ class BillingCostAllocator:
                 cached_input_tokens=int(item.get("cached_input_tokens") or 0),
                 output_tokens=int(item.get("output_tokens") or 0),
                 pricing_resolution=self.pricing_resolution,
+                cached_input_is_separate=coerce_optional_bool(item.get("cached_input_is_separate")),
             )
             if api_cost is not None:
                 api_basis += float(api_cost)

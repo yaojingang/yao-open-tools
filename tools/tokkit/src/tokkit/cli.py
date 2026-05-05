@@ -30,7 +30,13 @@ from .ingest_cursor import scan_cursor
 from .ingest_trae import scan_trae
 from .ingest_warp import scan_warp
 from .html_report import render_range_html_report
-from .pricing import estimate_cost_usd, iter_price_book, normalize_model_display, resolve_price_book
+from .pricing import (
+    coerce_optional_bool,
+    estimate_cost_usd,
+    iter_price_book,
+    normalize_model_display,
+    resolve_price_book,
+)
 from .proxy import ProxyConfig, serve_proxy
 from .scan_planner import ACTIVE_SCAN_LOOKBACK_DAYS, recent_active_targets, record_scan_plan_result, resolve_scan_plan
 from .utils import DEFAULT_DB_PATH, default_augment_capture_path, default_db_path, default_log_dir, default_report_dir, format_float, format_int, get_timezone, parse_timestamp, resolve_app_home, today_string
@@ -672,6 +678,7 @@ def render_daily_report(conn: sqlite3.Connection, target_date: str, *, json_mode
             COALESCE(model, '') AS model,
             COALESCE(json_extract(metadata_json, '$.originator'), '') AS originator,
             COALESCE(json_extract(metadata_json, '$.model_provider'), '') AS model_provider,
+            MAX(json_extract(metadata_json, '$.cached_input_is_separate')) AS cached_input_is_separate,
             SUM(input_tokens) AS input_tokens,
             SUM(output_tokens) AS output_tokens,
             SUM(cached_input_tokens) AS cached_input_tokens,
@@ -917,6 +924,7 @@ def render_range_report(conn: sqlite3.Connection, last_days: int, tz, *, json_mo
             COALESCE(model, '') AS model,
             COALESCE(json_extract(metadata_json, '$.originator'), '') AS originator,
             COALESCE(json_extract(metadata_json, '$.model_provider'), '') AS model_provider,
+            MAX(json_extract(metadata_json, '$.cached_input_is_separate')) AS cached_input_is_separate,
             SUM(input_tokens) AS input_tokens,
             SUM(output_tokens) AS output_tokens,
             SUM(cached_input_tokens) AS cached_input_tokens,
@@ -1955,6 +1963,7 @@ def _budget_window_row(
                 measurement_method,
                 COALESCE(model, '') AS model,
                 COALESCE(json_extract(metadata_json, '$.model_provider'), '') AS model_provider,
+                MAX(json_extract(metadata_json, '$.cached_input_is_separate')) AS cached_input_is_separate,
                 SUM(input_tokens) AS input_tokens,
                 SUM(output_tokens) AS output_tokens,
                 SUM(cached_input_tokens) AS cached_input_tokens,
@@ -2462,6 +2471,7 @@ def _aggregate_hourly_usage_rows(conn: sqlite3.Connection, target_date: str, tz)
                 measurement_method,
                 COALESCE(model, '') AS model,
                 COALESCE(json_extract(metadata_json, '$.model_provider'), '') AS model_provider,
+                json_extract(metadata_json, '$.cached_input_is_separate') AS cached_input_is_separate,
                 input_tokens,
                 output_tokens,
                 cached_input_tokens,
@@ -2675,6 +2685,7 @@ def _enrich_usage_rows(rows: Iterable[sqlite3.Row], *, conn: sqlite3.Connection 
             cached_input_tokens=int(item.get("cached_input_tokens") or 0),
             output_tokens=int(item.get("output_tokens") or 0),
             pricing_resolution=pricing_resolution,
+            cached_input_is_separate=coerce_optional_bool(item.get("cached_input_is_separate")),
         )
         if billing_allocator is not None:
             billing_allocator.enrich(item)
