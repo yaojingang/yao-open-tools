@@ -88,6 +88,29 @@ class EstimateCostUsdTests(unittest.TestCase):
             18.5,
         )
 
+    def test_estimates_claude_opus_4_7_real_world_full_cache(self) -> None:
+        # Regression for yaojingang/yao-cli-tools#2: real-world Opus 4.7 day
+        # with cached_input >> input tokens. cached_input_tokens must NOT be
+        # truncated to input_tokens (the OpenAI subset semantics) — Anthropic
+        # bills cache_read_input_tokens as a disjoint counter on top of
+        # input_tokens. Expected cost ~$63.86.
+        #
+        #   3.414443M input   * $5.00 = $17.072215
+        #  76.542372M cached  * $0.50 = $38.271186
+        #   0.340697M output  * $25.00 = $ 8.517425
+        #                              = $63.860826
+        self.assertEqual(
+            estimate_cost_usd(
+                model="claude-opus-4-7-20260416",
+                provider="anthropic",
+                measurement_method="exact",
+                input_tokens=3_414_443,
+                cached_input_tokens=76_542_372,
+                output_tokens=340_697,
+            ),
+            63.860826,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
