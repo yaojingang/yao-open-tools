@@ -191,6 +191,9 @@ def _scan_session_file(
                             "turn_model": cursor.current_model,
                             "model_provider": cursor.model_provider,
                             "model_context_window": info.get("model_context_window"),
+                            "cached_input_is_separate": _provider_uses_disjoint_cache(
+                                cursor.model_provider
+                            ),
                         },
                     ),
                 )
@@ -218,6 +221,14 @@ def _clean_str(value: object) -> str | None:
         if cleaned:
             return cleaned
     return None
+
+
+def _provider_uses_disjoint_cache(provider: str | None) -> bool:
+    # Codex sessions can declare alternative backends via session_meta's
+    # model_provider (e.g. "anthropic" via a custom proxy). Default OpenAI
+    # semantics treat cached_input_tokens as a subset of input_tokens; only
+    # Anthropic-style providers count it disjointly.
+    return (provider or "").strip().lower() in {"anthropic", "claude"}
 
 
 def _cursor_from_state(previous) -> SessionCursor:

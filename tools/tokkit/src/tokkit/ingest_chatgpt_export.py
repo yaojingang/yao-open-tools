@@ -143,6 +143,8 @@ def _scan_conversation(
             "export_path": str(export_path),
             "estimation_method": "chatgpt_export_text_parts",
             "notes": "Estimated from official ChatGPT export text, not provider billable usage.",
+            "model_provider": "openai",
+            "cached_input_is_separate": False,
         }
 
         input_tokens = total_tokens if role != "assistant" else None

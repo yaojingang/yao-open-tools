@@ -196,6 +196,7 @@ def _scan_session_file(
                         "claude_version": event.get("version"),
                         "git_branch": event.get("gitBranch"),
                         "model_provider": "anthropic",
+                        "cached_input_is_separate": True,
                     },
                 }
 

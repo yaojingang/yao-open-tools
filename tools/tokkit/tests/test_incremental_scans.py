@@ -328,10 +328,11 @@ class IncrementalScanTests(unittest.TestCase):
 
     def test_claude_scan_writes_anthropic_provider_metadata(self) -> None:
         # yaojingang/yao-cli-tools#2 follow-up: Claude Code only talks to
-        # Anthropic, so ingest must stamp model_provider='anthropic' on every
-        # record. pricing.estimate_cost_usd() then has a stable, ingest-time
-        # signal for the disjoint cached_input_tokens algorithm instead of
-        # depending on the "Claude " model-name prefix as a fallback.
+        # Anthropic, so ingest must stamp model_provider='anthropic' AND
+        # cached_input_is_separate=True on every record. pricing then has a
+        # stable, ingest-time signal for the disjoint cached_input_tokens
+        # algorithm instead of depending on the "Claude " model-name prefix
+        # as a fallback.
         conn = sqlite3.connect(":memory:")
         conn.row_factory = sqlite3.Row
         init_db(conn)
@@ -368,11 +369,17 @@ class IncrementalScanTests(unittest.TestCase):
             scan_claude_code(conn, claude_home=claude_home, tz=tz)
 
         row = conn.execute(
-            "SELECT json_extract(metadata_json, '$.model_provider') AS provider "
-            "FROM usage_records WHERE app = 'claude-code'"
+            """
+            SELECT
+                json_extract(metadata_json, '$.model_provider') AS provider,
+                json_extract(metadata_json, '$.cached_input_is_separate') AS cached_separate
+            FROM usage_records WHERE app = 'claude-code'
+            """
         ).fetchone()
         self.assertIsNotNone(row)
         self.assertEqual(row["provider"], "anthropic")
+        # SQLite's json_extract returns the JSON true literal as the integer 1.
+        self.assertEqual(row["cached_separate"], 1)
 
     def test_augment_history_reuses_checkpoint_cache_after_first_scan(self) -> None:
         conn = sqlite3.connect(":memory:")
