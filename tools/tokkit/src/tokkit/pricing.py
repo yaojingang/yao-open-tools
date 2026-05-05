@@ -147,6 +147,7 @@ def estimate_cost_usd(
     cached_input_tokens: int | None,
     output_tokens: int | None,
     pricing_resolution: PriceBookResolution | None = None,
+    cached_input_is_separate: bool | None = None,
 ) -> float | None:
     if measurement_method != "exact":
         return None
@@ -165,7 +166,12 @@ def estimate_cost_usd(
         return None
     pricing = profile.pricing
 
-    if _uses_disjoint_cached_input_tokens(normalized, provider):
+    if cached_input_is_separate is None:
+        disjoint = _uses_disjoint_cached_input_tokens(normalized, provider)
+    else:
+        disjoint = bool(cached_input_is_separate)
+
+    if disjoint:
         uncached_input = total_input
         cached_billable = cached_input
     else:
@@ -188,6 +194,28 @@ def _uses_disjoint_cached_input_tokens(model_label: str, provider: str | None) -
     if provider_value in {"anthropic", "claude"}:
         return True
     return model_label.startswith("Claude ")
+
+
+def coerce_optional_bool(value: object) -> bool | None:
+    """Normalize the cached_input_is_separate flag from SQLite/JSON to bool|None.
+
+    json_extract on the metadata_json column returns int 1/0 for stored
+    JSON true/false, and NULL for missing keys (legacy rows). Strings are
+    accepted as a defensive fallback in case the field is hand-edited.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        cleaned = value.strip().lower()
+        if cleaned in {"true", "1", "yes"}:
+            return True
+        if cleaned in {"false", "0", "no", ""}:
+            return False
+    return None
 
 
 def _load_override_profiles(path: Path) -> dict[str, ModelPrice]:
