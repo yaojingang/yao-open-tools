@@ -1,5 +1,5 @@
 [project]
-name = "memview"
+name = "tokscai"
 version = "0.1.0"
 description = "Tiny CLI for categorized local memory usage."
 readme = "README.md"
@@ -23,7 +23,7 @@ classifiers = [
 test = []
 
 [project.scripts]
-mem = "memview.cli:main"
+tokscai = "tokscai.cli:main"
 
 [build-system]
 requires = ["setuptools>=68"]

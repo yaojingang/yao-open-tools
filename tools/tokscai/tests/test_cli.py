@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from memview.cli import (
+from tokscai.cli import (
     GraphicsDevice,
     MemoryCategory,
     MemorySnapshot,
@@ -78,21 +78,21 @@ class FormattingTests(unittest.TestCase):
     def test_help_lists_commands_and_sections(self) -> None:
         help_text = build_parser().format_help()
         self.assertIn("常用命令:", help_text)
-        self.assertIn("mem ai", help_text)
-        self.assertIn("mem optimize", help_text)
-        self.assertIn("mem tui", help_text)
-        self.assertIn("mem top 20", help_text)
-        self.assertIn("mem completion zsh", help_text)
-        self.assertNotIn("mem --top", help_text)
+        self.assertIn("tokscai ai", help_text)
+        self.assertIn("tokscai optimize", help_text)
+        self.assertIn("tokscai tui", help_text)
+        self.assertIn("tokscai top 20", help_text)
+        self.assertIn("tokscai completion zsh", help_text)
+        self.assertNotIn("tokscai --top", help_text)
         self.assertIn("输出区域:", help_text)
 
     def test_zsh_completion_script_contains_autosuggest_candidates(self) -> None:
         script = render_completion_script("zsh")
-        self.assertIn("#compdef mem", script)
-        self.assertIn("_zsh_autosuggest_strategy_mem", script)
-        self.assertIn("'mem tui'", script)
-        self.assertIn("'mem top 20'", script)
-        self.assertIn("'mem ai cli none'", script)
+        self.assertIn("#compdef tokscai", script)
+        self.assertIn("_zsh_autosuggest_strategy_tokscai", script)
+        self.assertIn("'tokscai tui'", script)
+        self.assertIn("'tokscai top 20'", script)
+        self.assertIn("'tokscai ai cli none'", script)
 
     def test_format_bytes(self) -> None:
         self.assertEqual(format_bytes(0), "0 B")
@@ -113,8 +113,8 @@ class FormattingTests(unittest.TestCase):
             "建议下一步命令：\n\n```bash\nmem --top 20\nmem --watch 2\n```\n"
         )
         self.assertNotIn("```", formatted)
-        self.assertIn("  $ mem top 20", formatted)
-        self.assertIn("  $ mem watch 2", formatted)
+        self.assertIn("  $ tokscai top 20", formatted)
+        self.assertIn("  $ tokscai watch 2", formatted)
 
     def test_software_risk(self) -> None:
         self.assertEqual(
@@ -334,7 +334,7 @@ class RenderTests(unittest.TestCase):
         for view in TUI_VIEWS:
             frame = render_tui_frame(snapshot, view=view, scroll=0, width=80, height=12, top=None)
             rendered = "\n".join(frame.lines)
-            self.assertIn("mem TUI", rendered)
+            self.assertIn("tokscai TUI", rendered)
             self.assertIn("Tab/1-4", rendered)
             self.assertGreaterEqual(frame.max_scroll, 0)
 
@@ -357,7 +357,7 @@ class RenderTests(unittest.TestCase):
 
     def test_guide_commands_include_ai_optimize_watch(self) -> None:
         commands = [item["command"] for item in guide_commands("none")]
-        self.assertEqual(commands, ["mem ai", "mem optimize", "mem watch 2"])
+        self.assertEqual(commands, ["tokscai ai", "tokscai optimize", "tokscai watch 2"])
 
     def test_print_output_can_suppress_guidance(self) -> None:
         snapshot = MemorySnapshot(
@@ -376,7 +376,7 @@ class RenderTests(unittest.TestCase):
         )
         args = SimpleNamespace(json=False, no_processes=False, no_guide=False, ai_cli="none")
         output = StringIO()
-        with patch("memview.cli.render_guidance", return_value="GUIDE") as render_guidance:
+        with patch("tokscai.cli.render_guidance", return_value="GUIDE") as render_guidance:
             with redirect_stdout(output):
                 print_output(snapshot, args, show_guide=False)
         render_guidance.assert_not_called()
@@ -446,9 +446,9 @@ class CollectionTests(unittest.TestCase):
                 details={},
             )
 
-        with patch("memview.cli.platform.system", return_value="TestOS"):
-            with patch("memview.cli.collect_processes", return_value=processes) as collect_processes:
-                with patch("memview.cli.collect_generic", side_effect=fake_generic):
+        with patch("tokscai.cli.platform.system", return_value="TestOS"):
+            with patch("tokscai.cli.collect_processes", return_value=processes) as collect_processes:
+                with patch("tokscai.cli.collect_generic", side_effect=fake_generic):
                     snapshot = collect_snapshot(process_limit=2)
 
         collect_processes.assert_called_once_with(limit=None)

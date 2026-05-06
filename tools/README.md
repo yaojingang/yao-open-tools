@@ -15,4 +15,4 @@ Suggested pattern:
 
 Current tools:
 
-- `mem`: categorized local memory usage viewer.
+- `tokscai`: categorized local memory usage viewer.
