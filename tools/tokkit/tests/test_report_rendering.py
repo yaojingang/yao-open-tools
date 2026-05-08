@@ -98,8 +98,11 @@ class ReportRenderingTests(unittest.TestCase):
 
         self.assertIn("Unsplit", rendered)
         self.assertIn("Prompt", rendered)
+        self.assertIn("Completion", rendered)
         self.assertIn("Cached Prompt", rendered)
+        self.assertNotIn("Reasoning", rendered)
         self.assertNotIn("| Input", rendered)
+        self.assertNotIn("| Output", rendered)
         self.assertNotIn("By source:", rendered)
         self.assertIn("150,702", rendered)
         self.assertEqual(payload["by_source"][0]["unsplit_tokens"], 150702)

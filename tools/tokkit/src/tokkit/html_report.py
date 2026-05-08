@@ -47,7 +47,7 @@ def render_range_html_report(
             '<section id="trend" class="anchor-section chart-grid">',
             _panel("每日 Token 趋势", '<div id="totalTrend"></div>', "panel.totalTrend"),
             _panel("计费费用趋势", '<div id="costTrend"></div>', "panel.costTrend"),
-            _panel("Prompt / Output / 缓存趋势", '<div id="promptTrend"></div>', "panel.promptTrend"),
+            _panel("Prompt / Completion / 缓存趋势", '<div id="promptTrend"></div>', "panel.promptTrend"),
             _panel("缓存命中率趋势", '<div id="cacheTrend"></div>', "panel.cacheTrend"),
             "</section>",
             '<section id="models" class="anchor-section wide-grid">',
@@ -665,7 +665,7 @@ const I18N = {
     'filters.hintSelected': '当前显示 {count} 个模型。时间范围：最近 {range} 天。',
     'panel.totalTrend': '每日 Token 趋势',
     'panel.costTrend': '计费费用趋势',
-    'panel.promptTrend': 'Prompt / Output / 缓存趋势',
+    'panel.promptTrend': 'Prompt / Completion / 缓存趋势',
     'panel.cacheTrend': '缓存命中率趋势',
     'panel.modelRank': '模型消耗排行',
     'panel.modelTrend': '核心模型每日消耗',
@@ -683,8 +683,8 @@ const I18N = {
     'summary.billingPolicy': '按 billing.json 口径',
     'summary.dailyAvg': '日均 {value}',
     'summary.prompt': 'Prompt',
-    'summary.output': 'Output',
-    'summary.generatedOutput': '生成输出',
+    'summary.output': 'Completion',
+    'summary.generatedOutput': '生成端总输出',
     'summary.cachedPrompt': '缓存 Prompt',
     'summary.cacheHitRate': '命中率 {value}',
     'summary.unsplit': 'Unsplit',
@@ -701,9 +701,8 @@ const I18N = {
     'table.allocatedCost': '订阅均摊',
     'table.billableCost': '计费费用',
     'table.prompt': 'Prompt',
-    'table.output': 'Output',
+    'table.output': 'Completion',
     'table.cachedPrompt': '缓存 Prompt',
-    'table.reasoning': 'Reasoning',
     'table.unsplit': 'Unsplit',
     'table.records': '记录',
     'empty': '暂无记录。',
@@ -737,7 +736,7 @@ const I18N = {
     'filters.hintSelected': 'Showing {count} models. Range: last {range} days.',
     'panel.totalTrend': 'Daily Token Trend',
     'panel.costTrend': 'Billable Cost Trend',
-    'panel.promptTrend': 'Prompt / Output / Cached Trend',
+    'panel.promptTrend': 'Prompt / Completion / Cached Trend',
     'panel.cacheTrend': 'Cache Hit Rate Trend',
     'panel.modelRank': 'Model Usage Ranking',
     'panel.modelTrend': 'Core Model Daily Usage',
@@ -755,8 +754,8 @@ const I18N = {
     'summary.billingPolicy': 'Using billing.json policy',
     'summary.dailyAvg': 'Daily avg {value}',
     'summary.prompt': 'Prompt',
-    'summary.output': 'Output',
-    'summary.generatedOutput': 'Generated output',
+    'summary.output': 'Completion',
+    'summary.generatedOutput': 'Generated completion tokens',
     'summary.cachedPrompt': 'Cached Prompt',
     'summary.cacheHitRate': 'Hit rate {value}',
     'summary.unsplit': 'Unsplit',
@@ -773,9 +772,8 @@ const I18N = {
     'table.allocatedCost': 'Allocated',
     'table.billableCost': 'Billable',
     'table.prompt': 'Prompt',
-    'table.output': 'Output',
+    'table.output': 'Completion',
     'table.cachedPrompt': 'Cached Prompt',
-    'table.reasoning': 'Reasoning',
     'table.unsplit': 'Unsplit',
     'table.records': 'Records',
     'empty': 'No records.',
@@ -1100,7 +1098,7 @@ function rankedBars(rows, labelKey, valueKey, limit = 8) {
 function dailyTable(rows) {
   if (!rows.length) return `<p class="empty">${t('empty')}</p>`;
   return `<div class="table-wrap"><table>
-    <thead><tr><th>${t('table.date')}</th><th>${t('table.total')}</th><th>${t('table.billableCost')}</th><th>${t('table.estimatedCost')}</th><th>${t('table.allocatedCost')}</th><th>${t('table.prompt')}</th><th>${t('table.output')}</th><th>${t('table.cachedPrompt')}</th><th>${t('table.reasoning')}</th><th>${t('table.unsplit')}</th><th>${t('table.records')}</th></tr></thead>
+    <thead><tr><th>${t('table.date')}</th><th>${t('table.total')}</th><th>${t('table.billableCost')}</th><th>${t('table.estimatedCost')}</th><th>${t('table.allocatedCost')}</th><th>${t('table.prompt')}</th><th>${t('table.output')}</th><th>${t('table.cachedPrompt')}</th><th>${t('table.unsplit')}</th><th>${t('table.records')}</th></tr></thead>
     <tbody>${[...rows].reverse().map(row => `<tr>
       <td>${escapeHtml(row.local_date || row.key)}</td>
       <td>${fmtInt(row.total_tokens)}</td>
@@ -1110,7 +1108,6 @@ function dailyTable(rows) {
       <td>${fmtInt(row.input_tokens)}</td>
       <td>${fmtInt(row.output_tokens)}</td>
       <td>${fmtInt(row.cached_input_tokens)}</td>
-      <td>${fmtInt(row.reasoning_tokens)}</td>
       <td>${fmtInt(row.unsplit_tokens)}</td>
       <td>${fmtInt(row.records)}</td>
     </tr>`).join('')}</tbody>

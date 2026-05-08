@@ -85,8 +85,8 @@ TokKit 的核心流程是本地优先的数据管道：
 - 多个 AI 编码工具统一到一个本地台账。
 - 默认不需要托管后台，数据留在本机。
 - 明确区分 `exact`、`partial` 和 `estimated`，不混淆精度。
-- 支持按日期、来源、终端、客户端、模型、Prompt、Output、Cached Prompt、
-  Reasoning、Unsplit、API 估价、订阅分摊、最终计费、Credits、Records 聚合。
+- 支持按日期、来源、终端、客户端、模型、Prompt、Completion、Cached Prompt、
+  Unsplit、API 估价、订阅分摊、最终计费、Credits、Records 聚合。
 - 交互式 HTML 报告默认简体中文，支持英文切换、置顶导航、时间范围切换、
   模型筛选和图表 tooltip。
 - 增量扫描和活跃目标规划，让重复统计更快。
@@ -106,7 +106,7 @@ TokKit 的核心流程是本地优先的数据管道：
 - `Allocated $` 和 `Billable $` 依赖 `~/.tokkit/billing.json` 的订阅周期、
   月费和来源匹配规则；未配置订阅时会回退到 API 估价口径。
 - 只有 total-only、credits 或缺少模型价格的记录会保留为 partial/unsplit，
-  不能可靠拆分为 Prompt、Output 或 Cached Prompt 成本。
+  不能可靠拆分为 Prompt、Completion 或 Cached Prompt 成本。
 - HTML 报告和导出的 JSON 可能包含本地应用、模型、项目路径或 prompt 相关元数据，
   对外分享前应先检查内容。
 - 每天首次执行报表或扫描命令会自动生成最近 30 天 HTML 报告，并把报告路径输出到
@@ -116,8 +116,8 @@ TokKit 的核心流程是本地优先的数据管道：
 
 当前各来源的行为：
 
-- **Codex Desktop / Codex CLI**：从本地日志精确统计 Prompt、Output、
-  Cached Prompt 和 Reasoning tokens。
+- **Codex Desktop / Codex CLI**：从本地日志精确统计 Prompt、Completion、
+  Cached Prompt，并在 JSON 中保留上游暴露的 reasoning 明细。
 - **Claude Code**：从本地 Claude session JSONL 精确统计，并识别可检测到的
   VS Code 入口。
 - **Warp**：从本地会话/账户数据做 partial 统计，保留可用的 vendor credits。
@@ -284,11 +284,11 @@ tokkit serve-proxy --host 127.0.0.1 --port 8765 --upstream-base-url https://api.
 - `Total`：当前行的总 token。
 - `Prompt`：输入/提示词 token；如果上游把缓存上下文也计入 input，这里也会
   包含 Cached Prompt。
-- `Output`：模型生成输出 token。
+- `Completion`：模型生成端总输出 token。对 Codex/OpenAI 这类日志，
+  reasoning token 是 Completion 的子集，不应再和 Completion 相加。
 - `Cached Prompt`：命中缓存的 Prompt token。
-- `Reasoning`：供应商暴露的 reasoning token。
-- `Unsplit`：只能拿到总量、无法安全拆成 Prompt/Output 的 token。
-- `API Est.$`：基于模型价格、Prompt、Cached Prompt 和 Output 本地估算的 API
+- `Unsplit`：只能拿到总量、无法安全拆成 Prompt/Completion 的 token。
+- `API Est.$`：基于模型价格、Prompt、Cached Prompt 和 Completion 本地估算的 API
   成本；OpenAI 的 cached tokens 通常包含在 input 内，Claude/Anthropic 的
   cache read tokens 通常是独立 token，TokKit 会按不同供应商语义分别计价。
 - `Allocated $`：订阅账号的均摊成本；按同一计费周期内各记录的 API 等价成本
@@ -298,11 +298,12 @@ tokkit serve-proxy --host 127.0.0.1 --port 8765 --upstream-base-url https://api.
 - `Credits`：供应商 credits，和美元分开保留。
 - `Records`：当前行背后的归一化记录数量。
 
-为什么 Prompt 往往远大于 Output：
+为什么 Prompt 往往远大于 Completion：
 
 - AI 编码 agent 会反复发送仓库上下文、工具调用轨迹、文件片段和对话历史。
 - Cached Prompt 仍然是 Prompt 体量，只是通常价格更低。
-- Output 常常只是 patch、命令或解释，远小于生成它所需要的上下文。
+- Completion 常常只是 patch、命令或解释，远小于生成它所需要的上下文。
+- JSON 输出仍保留 `reasoning_tokens`，用于需要更细粒度分析的脚本。
 
 ## 价格、计费与预算
 

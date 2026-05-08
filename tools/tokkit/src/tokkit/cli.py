@@ -758,9 +758,8 @@ def render_daily_report(conn: sqlite3.Connection, target_date: str, *, json_mode
         (
             "Totals: "
             f"prompt={format_int(totals['input_tokens'])} "
-            f"output={format_int(totals['output_tokens'])} "
+            f"completion={format_int(totals['output_tokens'])} "
             f"cached_prompt={format_int(totals['cached_input_tokens'])} "
-            f"reasoning={format_int(totals['reasoning_tokens'])} "
             f"unsplit={format_int(totals['unsplit_tokens'])} "
             f"total={format_int(totals['total_tokens'])} "
             f"api_est_usd={format_float(estimated_total_cost)} "
@@ -784,9 +783,8 @@ def render_daily_report(conn: sqlite3.Connection, target_date: str, *, json_mode
                     "Allocated $",
                     "Billable $",
                     "Prompt",
-                    "Output",
+                    "Completion",
                     "Cached Prompt",
-                    "Reasoning",
                     "Unsplit",
                     "Credits",
                     "Records",
@@ -801,14 +799,13 @@ def render_daily_report(conn: sqlite3.Connection, target_date: str, *, json_mode
                         format_int(row["input_tokens"]),
                         format_int(row["output_tokens"]),
                         format_int(row["cached_input_tokens"]),
-                        format_int(row["reasoning_tokens"]),
                         format_int(row["unsplit_tokens"]),
                         format_float(row["credits"]),
                         str(row["records"]),
                     ]
                     for row in by_hour
                 ],
-                right_align={1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
+                right_align={1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
             )
         )
 
@@ -831,9 +828,8 @@ def render_daily_report(conn: sqlite3.Connection, target_date: str, *, json_mode
                     "Allocated $",
                     "Billable $",
                     "Prompt",
-                    "Output",
+                    "Completion",
                     "Cached Prompt",
-                    "Reasoning",
                     "Unsplit",
                     "Credits",
                     "Records",
@@ -849,14 +845,13 @@ def render_daily_report(conn: sqlite3.Connection, target_date: str, *, json_mode
                         format_int(row["input_tokens"]),
                         format_int(row["output_tokens"]),
                         format_int(row["cached_input_tokens"]),
-                        format_int(row["reasoning_tokens"]),
                         format_int(row["unsplit_tokens"]),
                         format_float(row["credits"]),
                         str(row["records"]),
                     ]
                     for row in by_terminal
                 ],
-                right_align={2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12},
+                right_align={2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
             )
         )
 
@@ -879,9 +874,8 @@ def render_daily_report(conn: sqlite3.Connection, target_date: str, *, json_mode
                     "Allocated $",
                     "Billable $",
                     "Prompt",
-                    "Output",
+                    "Completion",
                     "Cached Prompt",
-                    "Reasoning",
                     "Unsplit",
                     "Credits",
                     "Records",
@@ -897,14 +891,13 @@ def render_daily_report(conn: sqlite3.Connection, target_date: str, *, json_mode
                         format_int(row["input_tokens"]),
                         format_int(row["output_tokens"]),
                         format_int(row["cached_input_tokens"]),
-                        format_int(row["reasoning_tokens"]),
                         format_int(row["unsplit_tokens"]),
                         format_float(row["credits"]),
                         str(row["records"]),
                     ]
                     for row in by_model
                 ],
-                right_align={2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12},
+                right_align={2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
             )
         )
 
@@ -1014,7 +1007,7 @@ def render_range_report(conn: sqlite3.Connection, last_days: int, tz, *, json_mo
             "",
             "By date:",
             _render_table(
-                headers=["Date", "Total", "API Est.$", "Allocated $", "Billable $", "Prompt", "Output", "Cached Prompt", "Reasoning", "Unsplit", "Credits", "Records"],
+                headers=["Date", "Total", "API Est.$", "Allocated $", "Billable $", "Prompt", "Completion", "Cached Prompt", "Unsplit", "Credits", "Records"],
                 rows=[
                     [
                         row["local_date"],
@@ -1025,19 +1018,18 @@ def render_range_report(conn: sqlite3.Connection, last_days: int, tz, *, json_mo
                         format_int(row["input_tokens"]),
                         format_int(row["output_tokens"]),
                         format_int(row["cached_input_tokens"]),
-                        format_int(row["reasoning_tokens"]),
                         format_int(row["unsplit_tokens"]),
                         format_float(row["credits"]),
                         str(row["records"]),
                     ]
                     for row in by_date_rows
                 ],
-                right_align={1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
+                right_align={1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
             ),
             "",
             "By terminal:",
             _render_table(
-                headers=["Terminal", "Method", "Total", "API Est.$", "Allocated $", "Billable $", "Prompt", "Output", "Cached Prompt", "Reasoning", "Unsplit", "Credits", "Records"],
+                headers=["Terminal", "Method", "Total", "API Est.$", "Allocated $", "Billable $", "Prompt", "Completion", "Cached Prompt", "Unsplit", "Credits", "Records"],
                 rows=[
                     [
                         row["terminal"],
@@ -1049,19 +1041,18 @@ def render_range_report(conn: sqlite3.Connection, last_days: int, tz, *, json_mo
                         format_int(row["input_tokens"]),
                         format_int(row["output_tokens"]),
                         format_int(row["cached_input_tokens"]),
-                        format_int(row["reasoning_tokens"]),
                         format_int(row["unsplit_tokens"]),
                         format_float(row["credits"]),
                         str(row["records"]),
                     ]
                     for row in by_terminal
                 ],
-                right_align={2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12},
+                right_align={2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
             ),
             "",
             "By model:",
             _render_table(
-                headers=["Model", "Method", "Total", "API Est.$", "Allocated $", "Billable $", "Prompt", "Output", "Cached Prompt", "Reasoning", "Unsplit", "Credits", "Records"],
+                headers=["Model", "Method", "Total", "API Est.$", "Allocated $", "Billable $", "Prompt", "Completion", "Cached Prompt", "Unsplit", "Credits", "Records"],
                 rows=[
                     [
                         row["model_label"],
@@ -1073,14 +1064,13 @@ def render_range_report(conn: sqlite3.Connection, last_days: int, tz, *, json_mo
                         format_int(row["input_tokens"]),
                         format_int(row["output_tokens"]),
                         format_int(row["cached_input_tokens"]),
-                        format_int(row["reasoning_tokens"]),
                         format_int(row["unsplit_tokens"]),
                         format_float(row["credits"]),
                         str(row["records"]),
                     ]
                     for row in by_model
                 ],
-                right_align={2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12},
+                right_align={2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
             ),
         ]
     )
@@ -1309,7 +1299,7 @@ def render_pricing_report(*, json_mode: bool) -> str:
             ),
             "",
             _render_table(
-                headers=["Model", "Prompt $/1M", "Cached Prompt $/1M", "Output $/1M", "Source"],
+                headers=["Model", "Prompt $/1M", "Cached Prompt $/1M", "Completion $/1M", "Source"],
                 rows=[
                     [
                         row["model"],

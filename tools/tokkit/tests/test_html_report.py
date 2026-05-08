@@ -79,6 +79,8 @@ class HtmlReportTests(unittest.TestCase):
         self.assertIn("function tooltipAttr", rendered)
         self.assertIn("function renderDashboard", rendered)
         self.assertIn("function lineChart", rendered)
+        self.assertIn("Completion", rendered)
+        self.assertNotIn("table.reasoning", rendered)
         self.assertIn("--module-gap: 16px", rendered)
         self.assertIn("grid-template-columns: repeat(4, minmax(0, 1fr))", rendered)
         self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr))", rendered)

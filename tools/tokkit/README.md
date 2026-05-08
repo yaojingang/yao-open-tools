@@ -87,9 +87,9 @@ TokKit also keeps compatibility with older `~/.tokstat` paths where practical.
 - One local ledger across many AI coding tools.
 - No hosted dashboard required; data stays on your machine by default.
 - Exact, partial, and estimated usage are explicitly separated.
-- Reports by date, source, terminal, client, model, prompt, output, cached
-  prompt, reasoning tokens, unsplit totals, API-equivalent estimates,
-  subscription allocation, final billable cost, credits, and records.
+- Reports by date, source, terminal, client, model, prompt, completion, cached
+  prompt, unsplit totals, API-equivalent estimates, subscription allocation,
+  final billable cost, credits, and records.
 - Interactive HTML report with Simplified Chinese by default, English toggle,
   sticky navigation, range switching, model filters, and chart tooltips.
 - Incremental scanning and active-target planning keep repeated reports fast.
@@ -112,7 +112,7 @@ TokKit also keeps compatibility with older `~/.tokstat` paths where practical.
   and source matching rules in `~/.tokkit/billing.json`; without a subscription
   profile, TokKit falls back to the API estimate.
 - Total-only, credits-only, or missing-price records remain partial/unsplit and
-  cannot be reliably decomposed into prompt, output, or cached prompt cost.
+  cannot be reliably decomposed into prompt, completion, or cached prompt cost.
 - HTML reports and JSON exports may include local app, model, project path, or
   prompt-related metadata; review them before sharing externally.
 - The first report or scan command each day automatically generates a
@@ -124,7 +124,7 @@ TokKit also keeps compatibility with older `~/.tokstat` paths where practical.
 Current source behavior:
 
 - **Codex Desktop / Codex CLI**: exact usage from local logs, including prompt,
-  output, cached prompt, and reasoning tokens.
+  completion, cached prompt, and provider reasoning detail in JSON.
 - **Claude Code**: exact usage from local Claude session JSONL, including
   detectable VS Code entrypoints.
 - **Warp**: partial usage from local conversation/accounting data, including
@@ -299,14 +299,16 @@ Core token fields:
 - `Total`: total tokens reported or reconstructed for the row.
 - `Prompt`: input/prompt tokens, including cached prompt tokens when upstream
   reports them that way.
-- `Output`: generated output tokens.
+- `Completion`: generated completion tokens. For Codex/OpenAI-style logs,
+  reasoning tokens are a subset of completion tokens and should not be added on
+  top of completion.
 - `Cached Prompt`: prompt tokens that were served from cache.
-- `Reasoning`: reasoning tokens when the provider exposes them.
-- `Unsplit`: totals that could not be safely split into prompt/output fields.
+- `Unsplit`: totals that could not be safely split into prompt/completion
+  fields.
 - `API Est.$`: local API cost estimate calculated from model pricing, prompt,
-  cached prompt, and output tokens. OpenAI cached tokens are usually included in
-  input totals, while Claude/Anthropic cache-read tokens are separate billable
-  tokens; TokKit prices those provider semantics differently.
+  cached prompt, and completion tokens. OpenAI cached tokens are usually
+  included in input totals, while Claude/Anthropic cache-read tokens are
+  separate billable tokens; TokKit prices those provider semantics differently.
 - `Allocated $`: subscription cost allocated by API-equivalent cost weight
   within the same billing cycle.
 - `Billable $`: final cost under `billing.json`. API sources use `API Est.$`;
@@ -314,13 +316,15 @@ Core token fields:
 - `Credits`: vendor credit units, kept separate from dollars.
 - `Records`: number of normalized usage records behind the row.
 
-Why prompt can be much larger than output:
+Why prompt can be much larger than completion:
 
 - AI coding agents resend large repository context, tool traces, file excerpts,
   and conversation history.
 - Cached prompt tokens still count as prompt volume, even when priced lower.
-- Output is often a short patch, command, or explanation compared with the
+- Completion is often a short patch, command, or explanation compared with the
   context needed to produce it.
+- JSON output still keeps `reasoning_tokens` for scripts that need finer-grained
+  provider details.
 
 ## Pricing, Billing, and Budgets
 
