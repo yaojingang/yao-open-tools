@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>tokscr result</title>
+    <link rel="stylesheet" href="result.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="mark">t</span>
+        <div>
+          <p class="eyebrow">capture result</p>
+          <h1>tokscr</h1>
+        </div>
+      </div>
+      <nav class="actions" aria-label="输出操作">
+        <button type="button" data-action="png">PNG</button>
+        <button type="button" data-action="jpeg">JPEG</button>
+        <button type="button" data-action="pdf">PDF</button>
+        <button type="button" data-action="copy">复制</button>
+        <button type="button" data-action="print">打印</button>
+      </nav>
+    </header>
+
+    <main class="layout">
+      <aside class="meta-panel">
+        <p class="label">来源</p>
+        <h2 id="captureTitle">读取截图中...</h2>
+        <p id="captureUrl" class="source-url"></p>
+        <dl class="meta-list">
+          <div>
+            <dt>模式</dt>
+            <dd id="captureMode">-</dd>
+          </div>
+          <div>
+            <dt>尺寸</dt>
+            <dd id="captureSize">-</dd>
+          </div>
+          <div>
+            <dt>时间</dt>
+            <dd id="captureTime">-</dd>
+          </div>
+        </dl>
+        <p id="statusText" class="status">准备就绪</p>
+      </aside>
+
+      <section class="preview-shell" aria-label="截图预览">
+        <img id="previewImage" alt="截图预览">
+      </section>
+    </main>
+
+    <script src="capture-store.js"></script>
+    <script src="result.js"></script>
+  </body>
+</html>

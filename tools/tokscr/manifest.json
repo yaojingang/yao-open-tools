@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "tokscr",
+  "description": "Capture full-page, visible-area, selected-area, and main-content screenshots. Export to PNG, JPEG, PDF, clipboard, or print.",
+  "version": "0.2.0",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "tokscr",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "permissions": [
+    "activeTab",
+    "clipboardWrite",
+    "downloads",
+    "offscreen",
+    "scripting",
+    "storage"
+  ]
+}

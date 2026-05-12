@@ -46,6 +46,12 @@ tok today
 tok html month
 ```
 
+### [tokscr](tools/tokscr/README.md)
+
+`tokscr` is a Chrome MV3 webpage screenshot extension. It captures full-page,
+visible-area, selected-area, and main-content screenshots, then exports the
+result to PNG, JPEG, PDF, clipboard, or print.
+
 ### [yao-scai-cli](tools/yao-scai-cli/README.md)
 
 `yao-scai-cli` is an AI-native disk space scanner and advisor. It is designed
@@ -74,6 +80,7 @@ Planned updates may include:
 
 - `tools/`: individual tools and small packages
 - `tools/tokkit`: AI coding usage ledger and report generator
+- `tools/tokscr`: Chrome webpage screenshot extension
 - `tools/yao-scai-cli`: disk space scanner and advisor
 
 ## Contributing Notes

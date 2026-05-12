@@ -1,0 +1,215 @@
+:root {
+  color-scheme: light;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Source Han Sans SC", sans-serif;
+  background: #f7f1e7;
+  color: #1e2f44;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 920px;
+  background: #f7f1e7;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 72px;
+  border-bottom: 1px solid #ddd1bf;
+  background: rgba(247, 241, 231, 0.94);
+  padding: 14px 22px;
+  backdrop-filter: blur(14px);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mark {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 8px;
+  background: #1f6f68;
+  color: #fff8ed;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.eyebrow,
+.label {
+  margin: 0;
+  color: #7a6d5e;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 2px 0 0;
+  font-family: Georgia, "Times New Roman", "Source Han Serif SC", serif;
+  font-size: 25px;
+  line-height: 1;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.actions button {
+  min-width: 68px;
+  min-height: 34px;
+  border: 1px solid #cfc0aa;
+  border-radius: 8px;
+  background: #fffaf2;
+  color: #1e2f44;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.actions button:hover {
+  border-color: #1f6f68;
+  color: #1f6f68;
+}
+
+.actions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 18px;
+  padding: 18px;
+}
+
+.meta-panel {
+  position: sticky;
+  top: 90px;
+  align-self: start;
+  display: grid;
+  gap: 14px;
+  border: 1px solid #ddd1bf;
+  border-radius: 8px;
+  background: #fffaf2;
+  padding: 18px;
+}
+
+h2 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", "Source Han Serif SC", serif;
+  font-size: 21px;
+  line-height: 1.2;
+}
+
+.source-url,
+.status {
+  margin: 0;
+  color: #6f6254;
+  font-size: 12px;
+  line-height: 1.45;
+  word-break: break-all;
+}
+
+.status {
+  border-top: 1px solid #eadfcc;
+  padding-top: 12px;
+  color: #1f6f68;
+  font-weight: 700;
+}
+
+.meta-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.meta-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #efe5d5;
+  padding-bottom: 8px;
+}
+
+.meta-list dt,
+.meta-list dd {
+  margin: 0;
+  font-size: 12px;
+}
+
+.meta-list dt {
+  color: #7a6d5e;
+}
+
+.meta-list dd {
+  color: #1e2f44;
+  font-weight: 700;
+  text-align: right;
+}
+
+.preview-shell {
+  min-height: calc(100vh - 108px);
+  overflow: auto;
+  border: 1px solid #ddd1bf;
+  border-radius: 8px;
+  background: #d9cebf;
+  padding: 20px;
+}
+
+#previewImage {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  background: #ffffff;
+  box-shadow: 0 16px 48px rgba(30, 47, 68, 0.18);
+}
+
+@media print {
+  @page {
+    margin: 12mm;
+  }
+
+  body {
+    min-width: 0;
+    background: #ffffff;
+  }
+
+  .topbar,
+  .meta-panel {
+    display: none !important;
+  }
+
+  .layout,
+  .preview-shell {
+    display: block;
+    padding: 0;
+    border: 0;
+    background: #ffffff;
+  }
+
+  #previewImage {
+    width: 100%;
+    max-width: 100%;
+    box-shadow: none;
+  }
+}

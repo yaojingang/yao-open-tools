@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>tokscr</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="popup">
+      <header class="header">
+        <div>
+          <p class="eyebrow">capture desk</p>
+          <h1>tokscr</h1>
+        </div>
+        <span class="mark">t</span>
+      </header>
+
+      <p id="tabTitle" class="tab-title">读取当前页面中...</p>
+
+      <section class="capture-grid" aria-label="截图模式">
+        <button class="capture-card primary" type="button" data-mode="full">
+          <span class="symbol">↧</span>
+          <span>
+            <strong>完整页面</strong>
+            <small>滚动拼接整个网页</small>
+          </span>
+        </button>
+        <button class="capture-card" type="button" data-mode="visible">
+          <span class="symbol">□</span>
+          <span>
+            <strong>可见区域</strong>
+            <small>只捕捉当前屏幕</small>
+          </span>
+        </button>
+        <button class="capture-card" type="button" data-mode="selection">
+          <span class="symbol">⌖</span>
+          <span>
+            <strong>选择区域</strong>
+            <small>拖拽框选页面局部</small>
+          </span>
+        </button>
+        <button class="capture-card" type="button" data-mode="content">
+          <span class="symbol">◫</span>
+          <span>
+            <strong>主体去噪</strong>
+            <small>裁掉导航和侧栏</small>
+          </span>
+        </button>
+      </section>
+
+      <section class="status-panel" aria-live="polite">
+        <div class="status-row">
+          <span id="statusText">准备就绪</span>
+          <span id="progressText">0%</span>
+        </div>
+        <div class="progress-track" aria-hidden="true">
+          <div id="progressBar" class="progress-bar"></div>
+        </div>
+      </section>
+
+      <footer class="footer">结果页支持 PNG、JPEG、PDF、复制和打印。</footer>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
