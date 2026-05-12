@@ -10,6 +10,8 @@ small, practical, documented, and easy to run locally.
 - [`tokkit/`](tokkit/README.md): local-first usage ledger for AI coding tools,
   with token/cost tracking, CLI reports, HTML reports, client coverage views,
   budgets, pricing overrides, and scan adapters for multiple coding assistants.
+- [`tokscr/`](tokscr/README.md): Chrome MV3 webpage screenshot extension with
+  full-page, visible-area, selected-area, and main-content capture modes.
 - [`yao-scai-cli/`](yao-scai-cli/README.md): AI-native disk space scanner and
   advisor with CLI/TUI workflows.
 
@@ -18,7 +20,7 @@ small, practical, documented, and easy to run locally.
 ```text
 tools/<tool-name>/
   README.md
-  pyproject.toml or package.json
+  pyproject.toml, package.json, manifest.json, or equivalent project metadata
   src/ or bin/
   tests/
   docs/
