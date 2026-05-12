@@ -89,6 +89,12 @@ h1 {
   color: #1f6f68;
 }
 
+.actions button.is-active {
+  border-color: #1f6f68;
+  background: #1f6f68;
+  color: #fffaf2;
+}
+
 .actions button:disabled {
   cursor: wait;
   opacity: 0.55;
@@ -173,15 +179,159 @@ h2 {
   border-radius: 8px;
   background: #d9cebf;
   padding: 20px;
+  text-align: center;
+}
+
+.crop-toolbar {
+  position: sticky;
+  top: 86px;
+  z-index: 7;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  margin: 0 auto 16px;
+  border: 1px solid #cfc0aa;
+  border-radius: 8px;
+  background: rgba(255, 250, 242, 0.96);
+  padding: 8px 10px;
+  color: #6f6254;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 10px 28px rgba(30, 47, 68, 0.12);
+  backdrop-filter: blur(12px);
+}
+
+.crop-toolbar[hidden] {
+  display: none;
+}
+
+.crop-toolbar button {
+  min-height: 28px;
+  border: 1px solid #cfc0aa;
+  border-radius: 7px;
+  background: #fffaf2;
+  color: #1e2f44;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.crop-toolbar button:first-of-type {
+  border-color: #1f6f68;
+  background: #1f6f68;
+  color: #fffaf2;
+}
+
+.crop-toolbar button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.preview-frame {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0;
 }
 
 #previewImage {
   display: block;
   max-width: 100%;
   height: auto;
-  margin: 0 auto;
   background: #ffffff;
   box-shadow: 0 16px 48px rgba(30, 47, 68, 0.18);
+}
+
+.crop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.crop-overlay[hidden] {
+  display: none;
+}
+
+.crop-box {
+  position: absolute;
+  border: 2px solid #fffaf2;
+  background:
+    linear-gradient(to right, rgba(255, 250, 242, 0.75) 1px, transparent 1px) 33.333% 0 / 33.333% 100%,
+    linear-gradient(to bottom, rgba(255, 250, 242, 0.75) 1px, transparent 1px) 0 33.333% / 100% 33.333%;
+  box-shadow:
+    0 0 0 9999px rgba(30, 47, 68, 0.46),
+    0 10px 30px rgba(30, 47, 68, 0.28);
+  cursor: move;
+  line-height: 1;
+}
+
+.crop-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #1f6f68;
+  border-radius: 999px;
+  background: #fffaf2;
+  box-shadow: 0 2px 8px rgba(30, 47, 68, 0.28);
+}
+
+.crop-handle-nw,
+.crop-handle-ne,
+.crop-handle-se,
+.crop-handle-sw {
+  width: 16px;
+  height: 16px;
+}
+
+.crop-handle-nw {
+  top: -9px;
+  left: -9px;
+  cursor: nwse-resize;
+}
+
+.crop-handle-ne {
+  top: -9px;
+  right: -9px;
+  cursor: nesw-resize;
+}
+
+.crop-handle-se {
+  right: -9px;
+  bottom: -9px;
+  cursor: nwse-resize;
+}
+
+.crop-handle-sw {
+  bottom: -9px;
+  left: -9px;
+  cursor: nesw-resize;
+}
+
+.crop-handle-n {
+  top: -8px;
+  left: calc(50% - 7px);
+  cursor: ns-resize;
+}
+
+.crop-handle-e {
+  top: calc(50% - 7px);
+  right: -8px;
+  cursor: ew-resize;
+}
+
+.crop-handle-s {
+  bottom: -8px;
+  left: calc(50% - 7px);
+  cursor: ns-resize;
+}
+
+.crop-handle-w {
+  top: calc(50% - 7px);
+  left: -8px;
+  cursor: ew-resize;
 }
 
 @media print {
@@ -195,7 +345,9 @@ h2 {
   }
 
   .topbar,
-  .meta-panel {
+  .meta-panel,
+  .crop-toolbar,
+  .crop-overlay {
     display: none !important;
   }
 

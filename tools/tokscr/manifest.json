@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "tokscr",
-  "description": "Capture full-page, visible-area, selected-area, and main-content screenshots. Export to PNG, JPEG, PDF, clipboard, or print.",
-  "version": "0.2.0",
+  "description": "Capture, crop, and export full-page, visible-area, selected-area, and content screenshots to PNG, JPEG, PDF, clipboard, or print.",
+  "version": "0.3.0",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",

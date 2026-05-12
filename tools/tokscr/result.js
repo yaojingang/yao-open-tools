@@ -1,4 +1,9 @@
 const previewImage = document.getElementById("previewImage");
+const cropToolbar = document.getElementById("cropToolbar");
+const cropOverlay = document.getElementById("cropOverlay");
+const cropBox = document.getElementById("cropBox");
+const cropApply = document.getElementById("cropApply");
+const cropCancel = document.getElementById("cropCancel");
 const captureTitle = document.getElementById("captureTitle");
 const captureUrl = document.getElementById("captureUrl");
 const captureMode = document.getElementById("captureMode");
@@ -6,6 +11,11 @@ const captureSize = document.getElementById("captureSize");
 const captureTime = document.getElementById("captureTime");
 const statusText = document.getElementById("statusText");
 const actionButtons = Array.from(document.querySelectorAll("[data-action]"));
+const {
+  clampCropRect,
+  createInitialCropRect,
+  selectionToNaturalRect
+} = window.TokscrCropUtils;
 
 const MODE_LABELS = {
   full: "完整页面",
@@ -13,17 +23,70 @@ const MODE_LABELS = {
   selection: "选择区域",
   content: "主体去噪"
 };
+const MIN_CROP_SIZE = 32;
 
 let record = null;
 let objectUrl = null;
+let isBusy = false;
+let cropState = {
+  active: false,
+  rect: null,
+  interaction: null
+};
 
 function setStatus(message) {
   statusText.textContent = message;
 }
 
-function setBusy(busy) {
+function updateButtonStates() {
   for (const button of actionButtons) {
-    button.disabled = busy;
+    const action = button.dataset.action;
+    button.disabled = isBusy || (cropState.active && action !== "crop");
+    button.classList.toggle("is-active", action === "crop" && cropState.active);
+  }
+
+  cropApply.disabled = isBusy;
+  cropCancel.disabled = isBusy;
+}
+
+function setBusy(busy) {
+  isBusy = busy;
+  updateButtonStates();
+}
+
+function getModeLabel() {
+  const label = MODE_LABELS[record?.mode] || record?.mode || "-";
+  return record?.cropped ? `${label}（已裁剪）` : label;
+}
+
+function renderMetadata() {
+  captureTitle.textContent = record.title || "webpage";
+  captureUrl.textContent = record.url || "";
+  captureMode.textContent = getModeLabel();
+  captureSize.textContent = `${record.width} × ${record.height}`;
+  captureTime.textContent = new Date(record.createdAt).toLocaleString();
+}
+
+function refreshPreviewImage() {
+  if (objectUrl) {
+    URL.revokeObjectURL(objectUrl);
+  }
+
+  objectUrl = URL.createObjectURL(record.blob);
+  previewImage.src = objectUrl;
+}
+
+async function ensurePreviewReady() {
+  if (previewImage.complete && previewImage.naturalWidth > 0) {
+    return;
+  }
+
+  if (previewImage.decode) {
+    await previewImage.decode().catch(() => {});
+  }
+
+  if (!previewImage.naturalWidth || !previewImage.naturalHeight) {
+    throw new Error("截图预览尚未加载完成");
   }
 }
 
@@ -52,7 +115,7 @@ function formatTimestamp(date) {
 
 function getBaseFilename(extension) {
   const title = sanitizeFilename(record?.title || "webpage");
-  const mode = MODE_LABELS[record?.mode] || "截图";
+  const mode = getModeLabel() || "截图";
   return `${title}-${mode}-${formatTimestamp(new Date(record?.createdAt || Date.now()))}.${extension}`;
 }
 
@@ -265,8 +328,287 @@ async function copyToClipboard() {
   ]);
 }
 
+function getPreviewDisplaySize() {
+  const bounds = previewImage.getBoundingClientRect();
+
+  return {
+    width: Math.max(1, Math.round(bounds.width)),
+    height: Math.max(1, Math.round(bounds.height))
+  };
+}
+
+function getOverlayPoint(event) {
+  const bounds = cropOverlay.getBoundingClientRect();
+
+  return {
+    x: event.clientX - bounds.left,
+    y: event.clientY - bounds.top
+  };
+}
+
+function updateCropBox() {
+  if (!cropState.rect) {
+    return;
+  }
+
+  cropBox.style.left = `${cropState.rect.x}px`;
+  cropBox.style.top = `${cropState.rect.y}px`;
+  cropBox.style.width = `${cropState.rect.width}px`;
+  cropBox.style.height = `${cropState.rect.height}px`;
+}
+
+function setCropMode(active) {
+  cropState.active = active;
+  cropOverlay.hidden = !active;
+  cropToolbar.hidden = !active;
+  updateButtonStates();
+}
+
+async function enterCropMode() {
+  if (!record) {
+    return;
+  }
+
+  setBusy(true);
+
+  try {
+    setStatus("正在准备裁剪");
+    await ensurePreviewReady();
+    const displaySize = getPreviewDisplaySize();
+    cropState.rect = createInitialCropRect(displaySize.width, displaySize.height, 0.08);
+    cropState.interaction = null;
+    setCropMode(true);
+    updateCropBox();
+    setStatus("拖动裁剪框或边角手柄，完成后点击应用裁剪");
+  } catch (error) {
+    setStatus(error.message || "裁剪准备失败");
+  } finally {
+    setBusy(false);
+  }
+}
+
+function cancelCropMode(message = "已取消裁剪") {
+  cropState.rect = null;
+  cropState.interaction = null;
+  setCropMode(false);
+  setStatus(message);
+}
+
+function buildResizeRect(startRect, handle, point) {
+  let left = startRect.x;
+  let top = startRect.y;
+  let right = startRect.x + startRect.width;
+  let bottom = startRect.y + startRect.height;
+
+  if (handle.includes("w")) {
+    left = point.x;
+  }
+
+  if (handle.includes("e")) {
+    right = point.x;
+  }
+
+  if (handle.includes("n")) {
+    top = point.y;
+  }
+
+  if (handle.includes("s")) {
+    bottom = point.y;
+  }
+
+  return {
+    x: left,
+    y: top,
+    width: right - left,
+    height: bottom - top
+  };
+}
+
+function updateCropFromPointer(point) {
+  const interaction = cropState.interaction;
+
+  if (!interaction) {
+    return;
+  }
+
+  const displaySize = getPreviewDisplaySize();
+  const dx = point.x - interaction.startPoint.x;
+  const dy = point.y - interaction.startPoint.y;
+
+  if (interaction.type === "draw") {
+    cropState.rect = clampCropRect({
+      x: interaction.startPoint.x,
+      y: interaction.startPoint.y,
+      width: dx,
+      height: dy
+    }, displaySize.width, displaySize.height, MIN_CROP_SIZE);
+  }
+
+  if (interaction.type === "move") {
+    cropState.rect = clampCropRect({
+      x: interaction.startRect.x + dx,
+      y: interaction.startRect.y + dy,
+      width: interaction.startRect.width,
+      height: interaction.startRect.height
+    }, displaySize.width, displaySize.height, MIN_CROP_SIZE);
+  }
+
+  if (interaction.type === "resize") {
+    cropState.rect = clampCropRect(
+      buildResizeRect(interaction.startRect, interaction.handle, point),
+      displaySize.width,
+      displaySize.height,
+      MIN_CROP_SIZE
+    );
+  }
+
+  updateCropBox();
+}
+
+function handleCropPointerDown(event) {
+  if (!cropState.active || event.button !== 0) {
+    return;
+  }
+
+  const point = getOverlayPoint(event);
+  const handle = event.target?.dataset?.handle;
+  const insideBox = event.target === cropBox || cropBox.contains(event.target);
+
+  event.preventDefault();
+  cropOverlay.setPointerCapture(event.pointerId);
+
+  if (handle) {
+    cropState.interaction = {
+      type: "resize",
+      handle,
+      startPoint: point,
+      startRect: { ...cropState.rect }
+    };
+    return;
+  }
+
+  if (insideBox) {
+    cropState.interaction = {
+      type: "move",
+      startPoint: point,
+      startRect: { ...cropState.rect }
+    };
+    return;
+  }
+
+  cropState.interaction = {
+    type: "draw",
+    startPoint: point,
+    startRect: null
+  };
+  cropState.rect = clampCropRect({
+    x: point.x,
+    y: point.y,
+    width: MIN_CROP_SIZE,
+    height: MIN_CROP_SIZE
+  }, getPreviewDisplaySize().width, getPreviewDisplaySize().height, MIN_CROP_SIZE);
+  updateCropBox();
+}
+
+function handleCropPointerMove(event) {
+  if (!cropState.interaction) {
+    return;
+  }
+
+  event.preventDefault();
+  updateCropFromPointer(getOverlayPoint(event));
+}
+
+function handleCropPointerUp(event) {
+  if (!cropState.interaction) {
+    return;
+  }
+
+  event.preventDefault();
+  cropState.interaction = null;
+
+  if (cropOverlay.hasPointerCapture(event.pointerId)) {
+    cropOverlay.releasePointerCapture(event.pointerId);
+  }
+}
+
+async function applyCrop() {
+  if (!record || !cropState.active || !cropState.rect) {
+    return;
+  }
+
+  setBusy(true);
+
+  try {
+    setStatus("正在应用裁剪");
+    await ensurePreviewReady();
+    const displaySize = getPreviewDisplaySize();
+    const naturalRect = selectionToNaturalRect(cropState.rect, {
+      displayWidth: displaySize.width,
+      displayHeight: displaySize.height,
+      naturalWidth: previewImage.naturalWidth,
+      naturalHeight: previewImage.naturalHeight
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = naturalRect.width;
+    canvas.height = naturalRect.height;
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error("浏览器无法创建裁剪画布");
+    }
+
+    context.drawImage(
+      previewImage,
+      naturalRect.x,
+      naturalRect.y,
+      naturalRect.width,
+      naturalRect.height,
+      0,
+      0,
+      naturalRect.width,
+      naturalRect.height
+    );
+
+    const blob = await canvasToBlob(canvas, "image/png");
+    record = {
+      ...record,
+      blob,
+      width: naturalRect.width,
+      height: naturalRect.height,
+      cropped: true,
+      crop: naturalRect,
+      editedAt: Date.now()
+    };
+
+    await CaptureStore.put(record);
+    refreshPreviewImage();
+    renderMetadata();
+    cancelCropMode("裁剪已应用，可继续保存 PNG、JPEG、PDF 或复制打印");
+  } catch (error) {
+    setStatus(error.message || "裁剪失败");
+  } finally {
+    setBusy(false);
+  }
+}
+
 async function runAction(action) {
   if (!record) {
+    return;
+  }
+
+  if (action === "crop") {
+    if (cropState.active) {
+      cancelCropMode();
+      return;
+    }
+
+    await enterCropMode();
+    return;
+  }
+
+  if (cropState.active) {
+    setStatus("请先应用或取消裁剪");
     return;
   }
 
@@ -324,13 +666,8 @@ async function loadResult() {
     throw new Error("截图记录不存在或已过期");
   }
 
-  objectUrl = URL.createObjectURL(record.blob);
-  previewImage.src = objectUrl;
-  captureTitle.textContent = record.title || "webpage";
-  captureUrl.textContent = record.url || "";
-  captureMode.textContent = MODE_LABELS[record.mode] || record.mode || "-";
-  captureSize.textContent = `${record.width} × ${record.height}`;
-  captureTime.textContent = new Date(record.createdAt).toLocaleString();
+  refreshPreviewImage();
+  renderMetadata();
   setStatus("准备就绪");
 }
 
@@ -339,6 +676,22 @@ for (const button of actionButtons) {
     runAction(button.dataset.action);
   });
 }
+
+cropOverlay.addEventListener("pointerdown", handleCropPointerDown);
+cropOverlay.addEventListener("pointermove", handleCropPointerMove);
+cropOverlay.addEventListener("pointerup", handleCropPointerUp);
+cropOverlay.addEventListener("pointercancel", handleCropPointerUp);
+cropApply.addEventListener("click", applyCrop);
+cropCancel.addEventListener("click", () => cancelCropMode());
+window.addEventListener("resize", () => {
+  if (!cropState.active) {
+    return;
+  }
+
+  const displaySize = getPreviewDisplaySize();
+  cropState.rect = createInitialCropRect(displaySize.width, displaySize.height, 0.08);
+  updateCropBox();
+});
 
 window.addEventListener("beforeunload", () => {
   if (objectUrl) {

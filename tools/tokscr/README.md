@@ -2,7 +2,7 @@
 
 `tokscr` 是一个 Chrome MV3 网页截图插件，面向需要快速留存网页证据、内容页面、产品界面、长文档和社媒页面的场景。它默认在本地完成截图、拼接、预览和导出，不依赖远程服务，也不会把截图上传到服务器。
 
-当前版本：`0.2.0`
+当前版本：`0.3.0`
 
 ## 截图示例
 
@@ -20,10 +20,11 @@
 - **完整页面拼接**：自动滚动页面、分段捕捉视口，再合成为一张长图。
 - **主体去噪**：自动识别文章、文档、详情页等主体内容，裁掉导航栏、侧边栏、页脚等干扰区域。
 - **选择区域截图**：在网页上拖拽框选局部内容，适合截取页面中的某一块 UI 或内容段落。
+- **预览页二次裁剪**：截图生成后可在结果工作台再次进入裁剪模式，拖动裁剪框或边角手柄调整范围，再应用为新的导出图片。
 - **多格式导出**：结果页支持 PNG、JPEG、PDF、复制到剪贴板和打印。
 - **本地优先**：截图生成、裁剪、拼接、导出都在浏览器本地执行。
 - **低权限设计**：使用 `activeTab` 和用户主动点击触发，不申请全站点长期访问权限。
-- **Chrome Web Store 可发布包**：仓库内保留当前可上传包 `dist/tokscr-0.2.0.zip`。
+- **Chrome Web Store 可发布包**：仓库内保留当前可上传包 `dist/tokscr-0.3.0.zip`。
 
 ## 功能一览
 
@@ -33,6 +34,7 @@
 | 可见区域 | 捕捉当前浏览器窗口里可见的内容 | 快速截图、当前页面状态留档 |
 | 选择区域 | 拖拽框选页面局部后截图 | UI 局部、表格片段、指定内容块 |
 | 主体去噪 | 识别主要内容区域并裁掉页面噪音 | 文章页、博客页、内容页、报告页 |
+| 二次裁剪 | 在结果页拖动裁剪框并应用到当前截图 | 生成后微调边界、裁掉多余空白或边栏 |
 | PNG/JPEG | 保存为图片文件 | 分享、归档、插入文档 |
 | PDF | 保存为图片型 PDF | 交付、打印、归档 |
 | 复制 | 复制截图到剪贴板 | 粘贴到聊天、文档、工单 |
@@ -64,7 +66,7 @@ offscreen.js 使用 Canvas 拼接、裁剪、压缩、生成导出数据
 capture-store.js 临时保存截图结果
         |
         v
-result.html / result.js 展示、下载、复制、打印
+result.html / result.js 展示、二次裁剪、下载、复制、打印
 ```
 
 ### 完整页面截图
@@ -99,6 +101,17 @@ result.html / result.js 展示、下载、复制、打印
 3. 避开导航栏、页脚、侧边栏、弹窗等噪音区域。
 4. 如果无法可靠判断，则退化为较大的页面主体容器，避免误裁核心内容。
 
+### 预览页二次裁剪
+
+二次裁剪发生在结果工作台，不再回到原网页，也不会重新请求页面权限。
+
+1. 用户在结果页点击“裁剪”。
+2. 结果页在当前截图上覆盖一个裁剪框，默认选中图片中间主体区域。
+3. 用户可以拖动裁剪框移动范围，也可以拖动八个边角/边线手柄调整大小。
+4. `crop-utils.js` 将预览图上的裁剪坐标换算为原始图片像素坐标。
+5. `result.js` 使用 Canvas 生成新的 PNG Blob，并写回 `capture-store.js` 中的当前截图记录。
+6. 应用裁剪后，PNG、JPEG、PDF、复制、打印都会基于裁剪后的图片继续执行。
+
 ## 权限说明
 
 | 权限 | 用途 |
@@ -120,6 +133,7 @@ tools/tokscr/
   offscreen.html
   offscreen.js
   capture-store.js
+  crop-utils.js
   popup.html
   popup.css
   popup.js
@@ -129,7 +143,8 @@ tools/tokscr/
   icons/
   store-assets/
   docs/assets/
-  dist/tokscr-0.2.0.zip
+  tests/
+  dist/tokscr-0.3.0.zip
 ```
 
 ## 本地加载
@@ -150,7 +165,7 @@ tools/tokscr/
 当前可上传 Chrome Web Store 的包：
 
 ```text
-tools/tokscr/dist/tokscr-0.2.0.zip
+tools/tokscr/dist/tokscr-0.3.0.zip
 ```
 
 注意：zip 根目录包含 `manifest.json`，上传时不要再套一层外部文件夹。
@@ -158,13 +173,21 @@ tools/tokscr/dist/tokscr-0.2.0.zip
 重新打包可在 `tools/tokscr` 目录执行：
 
 ```bash
-zip -r dist/tokscr-0.2.0.zip \
+zip -r dist/tokscr-0.3.0.zip \
   manifest.json \
-  background.js capture-store.js content.js \
+  background.js capture-store.js content.js crop-utils.js \
   offscreen.html offscreen.js \
   popup.html popup.css popup.js \
   result.html result.css result.js \
   README.md icons
+```
+
+## 测试
+
+裁剪坐标换算使用 Node 内置测试覆盖，可在 `tools/tokscr` 目录执行：
+
+```bash
+node --test tests/crop-utils.test.js
 ```
 
 ## Chrome Web Store 素材
@@ -177,6 +200,7 @@ zip -r dist/tokscr-0.2.0.zip \
 - `screenshot-1-capture-modes.png`：截图模式示例
 - `screenshot-2-result-workbench.png`：结果工作台示例
 - `screenshot-3-privacy.png`：隐私说明示例
+- `dist/tokscr-0.3.0.zip`：当前 Chrome Web Store 上传包
 
 ## 使用限制
 

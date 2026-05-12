@@ -16,6 +16,7 @@
         </div>
       </div>
       <nav class="actions" aria-label="输出操作">
+        <button type="button" data-action="crop">裁剪</button>
         <button type="button" data-action="png">PNG</button>
         <button type="button" data-action="jpeg">JPEG</button>
         <button type="button" data-action="pdf">PDF</button>
@@ -47,11 +48,31 @@
       </aside>
 
       <section class="preview-shell" aria-label="截图预览">
-        <img id="previewImage" alt="截图预览">
+        <div id="cropToolbar" class="crop-toolbar" hidden>
+          <span>拖动裁剪框调整范围</span>
+          <button type="button" id="cropApply">应用裁剪</button>
+          <button type="button" id="cropCancel">取消</button>
+        </div>
+        <div id="previewFrame" class="preview-frame">
+          <img id="previewImage" alt="截图预览">
+          <div id="cropOverlay" class="crop-overlay" hidden>
+            <div id="cropBox" class="crop-box" role="group" aria-label="裁剪区域">
+              <span class="crop-handle crop-handle-nw" data-handle="nw"></span>
+              <span class="crop-handle crop-handle-ne" data-handle="ne"></span>
+              <span class="crop-handle crop-handle-se" data-handle="se"></span>
+              <span class="crop-handle crop-handle-sw" data-handle="sw"></span>
+              <span class="crop-handle crop-handle-n" data-handle="n"></span>
+              <span class="crop-handle crop-handle-e" data-handle="e"></span>
+              <span class="crop-handle crop-handle-s" data-handle="s"></span>
+              <span class="crop-handle crop-handle-w" data-handle="w"></span>
+            </div>
+          </div>
+        </div>
       </section>
     </main>
 
     <script src="capture-store.js"></script>
+    <script src="crop-utils.js"></script>
     <script src="result.js"></script>
   </body>
 </html>

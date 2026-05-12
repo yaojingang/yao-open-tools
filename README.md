@@ -24,7 +24,7 @@ Yao 的开源小工具集合，面向本地优先的 AI 编码、开发者效率
 | 工具 | 类型 | 入口 | 主要用途 |
 | --- | --- | --- | --- |
 | [TokKit](tools/tokkit/README.md) | Python CLI | `tok` / `tokkit` | AI 编码工具使用量台账，统计 token、成本、模型、终端、客户端和来源覆盖率。 |
-| [tokscr](tools/tokscr/README.md) | Chrome MV3 扩展 | 浏览器插件 | 网页截图工具，支持完整页面、可见区域、选择区域、主体去噪和 PNG/JPEG/PDF/复制/打印导出。 |
+| [tokscr](tools/tokscr/README.md) | Chrome MV3 扩展 | 浏览器插件 | 网页截图工具，支持完整页面、可见区域、选择区域、主体去噪、预览页二次裁剪和 PNG/JPEG/PDF/复制/打印导出。 |
 | [vidbrief](tools/vidbrief/README.md) | Python CLI/TUI | `vb` | 视频下载、字幕或音频转写、Transcript 整理和 AI 报告生成。 |
 | [mem](tools/mem/README.md) | Python CLI/TUI | `mem` | 本机内存、GPU、软件活跃度和进程明细诊断。 |
 | [Scai](tools/yao-scai-cli/README.md) | Python CLI/TUI | `scai` | AI-native 磁盘空间扫描与清理建议工具，用于找大文件、分析风险和生成释放空间方案。 |
@@ -67,6 +67,7 @@ tok html month
 - 可见区域截图：快速捕捉当前浏览器窗口。
 - 选择区域截图：拖拽框选页面局部。
 - 主体去噪截图：识别文章、文档、详情页等主体内容，裁掉导航栏、侧边栏、页脚等干扰区域。
+- 预览页二次裁剪：截图生成后可拖动裁剪框微调边界，再保存、复制或打印。
 - 多格式导出：PNG、JPEG、PDF、复制到剪贴板和打印。
 - 低权限设计：使用 `activeTab` 和用户主动点击触发，不申请全站点长期访问权限。
 
