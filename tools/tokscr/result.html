@@ -16,6 +16,7 @@
         </div>
       </div>
       <nav class="actions" aria-label="输出操作">
+        <button type="button" data-action="edit">编辑</button>
         <button type="button" data-action="crop">裁剪</button>
         <button type="button" data-action="png">PNG</button>
         <button type="button" data-action="jpeg">JPEG</button>
@@ -48,6 +49,43 @@
       </aside>
 
       <section class="preview-shell" aria-label="截图预览">
+        <div id="editorToolbar" class="editor-toolbar" hidden>
+          <div class="editor-group" aria-label="编辑工具">
+            <button type="button" data-editor-tool="select">选择</button>
+            <button type="button" data-editor-tool="crop">裁剪</button>
+            <button type="button" data-editor-tool="text">文字</button>
+            <button type="button" data-editor-tool="arrow">箭头</button>
+            <button type="button" data-editor-tool="rect">矩形</button>
+            <button type="button" data-editor-tool="brush">画笔</button>
+            <button type="button" data-editor-tool="mosaic">马赛克</button>
+            <button type="button" data-editor-tool="cover">遮盖</button>
+          </div>
+          <div class="editor-group editor-swatches" aria-label="颜色">
+            <button type="button" data-editor-color="#d93025" style="--swatch: #d93025" title="红色"></button>
+            <button type="button" data-editor-color="#fbbc04" style="--swatch: #fbbc04" title="黄色"></button>
+            <button type="button" data-editor-color="#1a73e8" style="--swatch: #1a73e8" title="蓝色"></button>
+            <button type="button" data-editor-color="#188038" style="--swatch: #188038" title="绿色"></button>
+            <button type="button" data-editor-color="#202124" style="--swatch: #202124" title="黑色"></button>
+            <button type="button" data-editor-color="#ffffff" style="--swatch: #ffffff" title="白色"></button>
+          </div>
+          <div class="editor-group" aria-label="线宽">
+            <button type="button" data-editor-width="3">细</button>
+            <button type="button" data-editor-width="6">中</button>
+            <button type="button" data-editor-width="12">粗</button>
+          </div>
+          <div class="editor-group" aria-label="字号">
+            <button type="button" data-editor-size="22">小字</button>
+            <button type="button" data-editor-size="32">中字</button>
+            <button type="button" data-editor-size="48">大字</button>
+          </div>
+          <div class="editor-group editor-commands" aria-label="编辑操作">
+            <button type="button" id="editorUndo">撤销</button>
+            <button type="button" id="editorRedo">重做</button>
+            <button type="button" id="editorDelete">删除</button>
+            <button type="button" id="editorCancel">取消</button>
+            <button type="button" id="editorApply">应用编辑</button>
+          </div>
+        </div>
         <div id="cropToolbar" class="crop-toolbar" hidden>
           <span>拖动裁剪框调整范围</span>
           <button type="button" id="cropApply">应用裁剪</button>
@@ -55,6 +93,8 @@
         </div>
         <div id="previewFrame" class="preview-frame">
           <img id="previewImage" alt="截图预览">
+          <canvas id="editorCanvas" class="editor-canvas" hidden></canvas>
+          <input id="inlineTextEditor" class="inline-text-editor" type="text" autocomplete="off" spellcheck="false" hidden>
           <div id="cropOverlay" class="crop-overlay" hidden>
             <div id="cropBox" class="crop-box" role="group" aria-label="裁剪区域">
               <span class="crop-handle crop-handle-nw" data-handle="nw"></span>
@@ -73,6 +113,7 @@
 
     <script src="capture-store.js"></script>
     <script src="crop-utils.js"></script>
+    <script src="editor-utils.js"></script>
     <script src="result.js"></script>
   </body>
 </html>

@@ -6,7 +6,7 @@ tokscr
 
 ## Summary
 
-Capture, crop, and export full-page, visible-area, selected-area, and content screenshots to PNG, JPEG, PDF, clipboard, or print.
+Capture, edit, crop, and export webpage screenshots to PNG, JPEG, PDF, clipboard, or print.
 
 ## Description
 
@@ -19,6 +19,7 @@ Capture what you need:
 - Selected area: drag to select a precise region on the page.
 - Main-content cleanup: detect the primary content area and crop away navigation, sidebars, and page noise.
 - Result-page crop: adjust the final screenshot with a draggable crop box before exporting.
+- Lightweight editor: add text, arrows, rectangles, freehand marks, mosaic blur, and solid covers directly on the screenshot.
 
 Export the result:
 
@@ -48,7 +49,7 @@ Data collection: No user data collected.
 
 Single-purpose statement:
 
-tokscr captures screenshots of the current webpage at the user's request and lets the user crop, export, copy, or print the screenshot locally.
+tokscr captures screenshots of the current webpage at the user's request and lets the user edit, crop, export, copy, or print the screenshot locally.
 
 Permission justifications:
 
@@ -71,4 +72,4 @@ Screenshots and metadata are processed locally in the browser. The extension doe
 - Screenshot 2: `store-assets/screenshot-2-result-workbench.png`
 - Screenshot 3: `store-assets/screenshot-3-privacy.png`
 - Small promo tile: `store-assets/promo-small-440x280.png`
-- Extension package: `dist/tokscr-0.3.0.zip`
+- Extension package: `dist/tokscr-0.4.6.zip`

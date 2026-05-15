@@ -202,6 +202,86 @@ h2 {
   backdrop-filter: blur(12px);
 }
 
+.editor-toolbar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 auto 16px;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid #cfc0aa;
+  border-radius: 8px;
+  background: #fffaf2;
+  padding: 10px;
+  color: #6f6254;
+}
+
+.editor-toolbar[hidden] {
+  display: none;
+}
+
+.editor-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-right: 1px solid #eadfcc;
+  padding-right: 8px;
+}
+
+.editor-group:last-child {
+  border-right: 0;
+  padding-right: 0;
+}
+
+.editor-toolbar button {
+  min-height: 28px;
+  border: 1px solid #cfc0aa;
+  border-radius: 7px;
+  background: #fffaf2;
+  color: #1e2f44;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.editor-toolbar button:hover {
+  border-color: #1f6f68;
+  color: #1f6f68;
+}
+
+.editor-toolbar button.is-active {
+  border-color: #1f6f68;
+  background: #1f6f68;
+  color: #fffaf2;
+}
+
+.editor-toolbar button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.editor-swatches button {
+  width: 28px;
+  min-width: 28px;
+  padding: 0;
+  border-radius: 999px;
+  background: var(--swatch);
+}
+
+.editor-swatches button[data-editor-color="#ffffff"] {
+  box-shadow: inset 0 0 0 1px #d4c6b3;
+}
+
+.editor-commands #editorApply {
+  border-color: #1f6f68;
+  background: #1f6f68;
+  color: #fffaf2;
+}
+
 .crop-toolbar[hidden] {
   display: none;
 }
@@ -249,6 +329,46 @@ h2 {
   z-index: 4;
   cursor: crosshair;
   touch-action: none;
+}
+
+.editor-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.editor-canvas[hidden] {
+  display: none;
+}
+
+.editor-canvas.is-selecting {
+  cursor: move;
+}
+
+.inline-text-editor {
+  position: absolute;
+  z-index: 5;
+  min-width: 140px;
+  max-width: calc(100% - 12px);
+  border: 2px solid #1f6f68;
+  border-radius: 6px;
+  background: rgba(255, 250, 242, 0.92);
+  color: var(--inline-text-color, #d93025);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Source Han Sans SC", sans-serif;
+  font-weight: 800;
+  line-height: 1.2;
+  outline: 0;
+  padding: 3px 6px;
+  box-shadow: 0 8px 22px rgba(30, 47, 68, 0.22);
+}
+
+.inline-text-editor[hidden] {
+  display: none;
 }
 
 .crop-overlay[hidden] {
@@ -346,6 +466,8 @@ h2 {
 
   .topbar,
   .meta-panel,
+  .editor-toolbar,
+  .editor-canvas,
   .crop-toolbar,
   .crop-overlay {
     display: none !important;
