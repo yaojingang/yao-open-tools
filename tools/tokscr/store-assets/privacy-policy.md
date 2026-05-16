@@ -25,7 +25,6 @@ tokscr uses Chrome extension permissions only for its screenshot workflow:
 - `downloads`: save exported files.
 - `clipboardWrite`: copy screenshots to the clipboard.
 - `offscreen`: compose screenshots and convert image blobs in a hidden extension page.
-- `storage`: support local extension state.
 
 ## Contact
 

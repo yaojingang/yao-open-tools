@@ -58,7 +58,7 @@ Permission justifications:
 - downloads: save exported PNG, JPEG, and PDF files.
 - clipboardWrite: copy generated screenshots to the clipboard.
 - offscreen: compose screenshots and convert image blobs in a hidden extension document.
-- storage: temporarily store generated screenshots locally so the result preview page can load them.
+Generated screenshots are stored temporarily in local IndexedDB so the result preview page can load them. This does not require the Chrome extension `storage` permission.
 
 Remote code: none.
 
@@ -72,4 +72,4 @@ Screenshots and metadata are processed locally in the browser. The extension doe
 - Screenshot 2: `store-assets/screenshot-2-result-workbench.png`
 - Screenshot 3: `store-assets/screenshot-3-privacy.png`
 - Small promo tile: `store-assets/promo-small-440x280.png`
-- Extension package: `dist/tokscr-0.4.6.zip`
+- Extension package: `dist/tokscr-0.4.7.zip`

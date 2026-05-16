@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "tokscr",
   "description": "Capture, edit, crop, and export webpage screenshots to PNG, JPEG, PDF, clipboard, or print.",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -27,7 +27,6 @@
     "clipboardWrite",
     "downloads",
     "offscreen",
-    "scripting",
-    "storage"
+    "scripting"
   ]
 }
