@@ -99,8 +99,8 @@ function bridgeScript(page) {
       .filter((node) => node.textContent.trim() || node.querySelector('img,video,canvas,svg,iframe'));
   }
 
-  function directDragHandle(node) {
-    return Array.from(node.children).find((child) => child.matches('[data-tokhtml-drag-handle]'));
+  function directModuleTools(node) {
+    return Array.from(node.children).find((child) => child.matches('[data-tokhtml-module-tools]'));
   }
 
   function enableEditing() {
@@ -189,7 +189,6 @@ function bridgeScript(page) {
     placeNodeAt(node, position.left, position.top);
     node.setAttribute('data-tokhtml-free-positioned', 'true');
     node.classList.add('tokhtml-module--free-positioned', 'tokhtml-module--free-dragging');
-    handle.draggable = false;
     freeDrag = {
       node,
       handle,
@@ -217,7 +216,6 @@ function bridgeScript(page) {
     if (!freeDrag) return;
     const current = freeDrag;
     current.node.classList.remove('tokhtml-module--free-dragging');
-    current.handle.draggable = true;
     if (current.handle.releasePointerCapture && current.pointerId !== undefined) {
       try {
         current.handle.releasePointerCapture(current.pointerId);
@@ -238,27 +236,67 @@ function bridgeScript(page) {
     scheduleSave();
   }
 
+  function insetParts(value) {
+    const parts = String(value || '').trim().split(/\\s+/).filter(Boolean);
+    if (!parts.length) return {};
+    return {
+      top: parts[0],
+      left: parts[3] || parts[1] || parts[0],
+    };
+  }
+
+  function normalizeFreePositionedStyle(node) {
+    if (node.style.position !== 'absolute') return;
+    const fallback = insetParts(node.style.inset);
+    const left = node.style.left || fallback.left;
+    const top = node.style.top || fallback.top;
+    if (!left || !top) return;
+    const declarations = String(node.getAttribute('style') || '')
+      .split(';')
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .filter((item) => !/^(position|inset|left|top|right|bottom)\\s*:/i.test(item));
+    node.setAttribute('style', ['position:absolute', 'left:' + left, 'top:' + top, ...declarations].join(';'));
+  }
+
   function mountModuleHandles() {
     movableNodes().forEach((node) => {
       node.setAttribute('data-tokhtml-module', 'true');
       node.classList.add('tokhtml-draggable-module');
-      if (!directDragHandle(node)) {
-        const handle = document.createElement('button');
-        handle.type = 'button';
-        handle.draggable = true;
-        handle.contentEditable = 'false';
-        handle.className = 'tokhtml-module-handle';
-        handle.setAttribute('data-tokhtml-bridge', 'drag-handle');
-        handle.setAttribute('data-tokhtml-drag-handle', 'true');
-        handle.setAttribute('aria-label', '拖动模块，按住 Alt 或 Option 可自由定位');
-        handle.title = '拖动排序；按住 Alt/Option 自由定位；双击还原定位';
-        handle.textContent = '↕';
-        handle.addEventListener('pointerdown', (event) => {
-          if (!event.altKey && !isFreePositioned(node)) return;
-          startFreeDrag(node, handle, event);
+      if (!directModuleTools(node)) {
+        const tools = document.createElement('div');
+        tools.contentEditable = 'false';
+        tools.className = 'tokhtml-module-tools';
+        tools.setAttribute('data-tokhtml-bridge', 'drag-handle');
+        tools.setAttribute('data-tokhtml-module-tools', 'true');
+
+        const freeHandle = document.createElement('button');
+        freeHandle.type = 'button';
+        freeHandle.contentEditable = 'false';
+        freeHandle.className = 'tokhtml-module-tool tokhtml-module-handle';
+        freeHandle.setAttribute('data-tokhtml-free-handle', 'true');
+        freeHandle.setAttribute('aria-label', '自由拖动模块');
+        freeHandle.title = '自由拖动定位；双击还原定位';
+        freeHandle.textContent = '↔';
+
+        const sortHandle = document.createElement('button');
+        sortHandle.type = 'button';
+        sortHandle.draggable = true;
+        sortHandle.contentEditable = 'false';
+        sortHandle.className = 'tokhtml-module-tool tokhtml-module-sort-handle';
+        sortHandle.setAttribute('data-tokhtml-drag-handle', 'true');
+        sortHandle.setAttribute('aria-label', '拖动排序模块');
+        sortHandle.title = '同级模块拖动排序';
+        sortHandle.textContent = '↕';
+
+        tools.append(freeHandle, sortHandle);
+        node.prepend(tools);
+
+        freeHandle.addEventListener('pointerdown', (event) => {
+          if (event.button !== 0) return;
+          startFreeDrag(node, freeHandle, event);
         });
-        node.prepend(handle);
-        handle.addEventListener('dragstart', (event) => {
+        sortHandle.addEventListener('dragstart', (event) => {
           if (freeDrag || isFreePositioned(node)) {
             event.preventDefault();
             return;
@@ -269,14 +307,14 @@ function bridgeScript(page) {
           event.dataTransfer.effectAllowed = 'move';
           event.dataTransfer.setData('text/plain', 'tokhtml-module');
         });
-        handle.addEventListener('dragend', () => {
+        sortHandle.addEventListener('dragend', () => {
           node.classList.remove('tokhtml-module--dragging');
           clearDropState();
           dragNode = null;
           if (dragMoved) scheduleSave();
           dragMoved = false;
         });
-        handle.addEventListener('dblclick', (event) => {
+        freeHandle.addEventListener('dblclick', (event) => {
           event.preventDefault();
           event.stopPropagation();
           resetFreePosition(node);
@@ -295,6 +333,7 @@ function bridgeScript(page) {
     const clone = document.documentElement.cloneNode(true);
     clone.querySelectorAll('[data-tokhtml-bridge]').forEach((node) => node.remove());
     clone.querySelectorAll('[data-tokhtml-module]').forEach((node) => {
+      normalizeFreePositionedStyle(node);
       node.removeAttribute('data-tokhtml-module');
       node.removeAttribute('data-tokhtml-free-positioned');
       node.removeAttribute('draggable');
@@ -380,9 +419,13 @@ export function injectEditBridge(page, html) {
   .tokhtml-editable:hover{outline-color:#9db4d0;background:rgba(238,242,247,.55)}
   .tokhtml-editable:focus{outline:2px solid #1B365D;background:rgba(238,242,247,.85)}
   .tokhtml-draggable-module{position:relative}
-  .tokhtml-module-handle{position:absolute;left:6px;top:6px;z-index:2147483646;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:1px solid #d1cfc5;border-radius:7px;background:#faf9f5;color:#1B365D;box-shadow:0 10px 24px rgba(20,20,19,.16);cursor:grab;font:700 15px/1 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;opacity:0;transition:opacity .15s ease,transform .15s ease}
-  .tokhtml-draggable-module:hover>.tokhtml-module-handle,.tokhtml-module-handle:focus{opacity:1}
-  .tokhtml-module-handle:active{cursor:grabbing;transform:scale(.96)}
+  .tokhtml-module-tools{position:absolute;left:6px;top:6px;z-index:2147483646;display:inline-flex;align-items:center;gap:4px;padding:3px;border:1px solid #d1cfc5;border-radius:7px;background:#faf9f5;box-shadow:0 10px 24px rgba(20,20,19,.16);opacity:0;transition:opacity .15s ease,transform .15s ease}
+  .tokhtml-module-tool{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;padding:0;border:0;border-radius:5px;background:#fffefa;color:#1B365D;cursor:pointer;font:700 15px/1 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+  .tokhtml-module-handle{cursor:move}
+  .tokhtml-module-sort-handle{cursor:grab}
+  .tokhtml-draggable-module:hover>.tokhtml-module-tools,.tokhtml-module-tools:focus-within{opacity:1}
+  .tokhtml-module-tool:active{transform:scale(.96)}
+  .tokhtml-module-sort-handle:active{cursor:grabbing}
   .tokhtml-module--dragging{opacity:.62;outline:2px solid #1B365D!important;outline-offset:4px}
   .tokhtml-module--drop-target{outline:2px dashed #1B365D!important;outline-offset:6px;background-image:linear-gradient(rgba(238,242,247,.58),rgba(238,242,247,.58))}
   .tokhtml-module--free-positioned{outline:1px solid rgba(27,54,93,.28);outline-offset:4px}

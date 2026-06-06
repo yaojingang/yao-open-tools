@@ -116,10 +116,34 @@ export function composeDocument(title, body) {
   ].join('');
 }
 
+function insetParts(value) {
+  const parts = String(value || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return {};
+  return {
+    top: parts[0],
+    left: parts[3] || parts[1] || parts[0],
+  };
+}
+
+function normalizeFreePositionedStyle(node) {
+  if (node.style.position !== 'absolute') return;
+  const fallback = insetParts(node.style.inset);
+  const left = node.style.left || fallback.left;
+  const top = node.style.top || fallback.top;
+  if (!left || !top) return;
+  const declarations = String(node.getAttribute('style') || '')
+    .split(';')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((item) => !/^(position|inset|left|top|right|bottom)\s*:/i.test(item));
+  node.setAttribute('style', ['position:absolute', `left:${left}`, `top:${top}`, ...declarations].join(';'));
+}
+
 export function removeEditBridge(html) {
   const { document } = parseHTML(String(html || ''));
   document.querySelectorAll('[data-tokhtml-bridge]').forEach((node) => node.remove());
   document.querySelectorAll('[data-tokhtml-module]').forEach((node) => {
+    normalizeFreePositionedStyle(node);
     node.removeAttribute('data-tokhtml-module');
     node.removeAttribute('data-tokhtml-free-positioned');
     node.removeAttribute('draggable');
