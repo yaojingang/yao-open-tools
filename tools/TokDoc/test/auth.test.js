@@ -72,6 +72,13 @@ test('requires login for management APIs and keeps a long-lived session cookie',
   const legacyPages = await app.inject({ method: 'GET', url: '/api/pages', headers: { cookie: legacySessionCookie(login) } });
   assert.equal(legacyPages.statusCode, 200);
 
+  const mixedCookiePages = await app.inject({
+    method: 'GET',
+    url: '/api/pages',
+    headers: { cookie: `tokdoc_session=invalid; ${legacySessionCookie(login)}` },
+  });
+  assert.equal(mixedCookiePages.statusCode, 200);
+
   const logout = await app.inject({ method: 'POST', url: '/api/logout', headers: { cookie: sessionCookie(login) } });
   assert.equal(logout.statusCode, 200);
   const logoutCookies = String(logout.headers['set-cookie']);

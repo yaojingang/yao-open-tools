@@ -45,3 +45,20 @@ test('keeps legacy TokHtml env and database paths compatible', async (t) => {
   assert.equal(config.allowSourceWrite, true);
   assert.equal(config.officeConverterBin, '/legacy/soffice');
 });
+
+test('auto-detects sibling TokHtml data directory left by a git rename', async (t) => {
+  const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tokdoc-root-'));
+  t.after(() => fs.rm(rootDir, { recursive: true, force: true }));
+  const tokdocRoot = path.join(rootDir, 'TokDoc');
+  const legacyDataDir = path.join(rootDir, 'TokHtml', 'data');
+  await fs.mkdir(path.join(tokdocRoot, 'data'), { recursive: true });
+  await fs.mkdir(legacyDataDir, { recursive: true });
+  await fs.writeFile(path.join(legacyDataDir, 'tokhtml.db'), '');
+
+  const config = loadConfig({}, tokdocRoot);
+
+  assert.equal(config.dataDir, legacyDataDir);
+  assert.equal(config.dbPath, path.join(legacyDataDir, 'tokhtml.db'));
+  assert.equal(config.uploadsDir, path.join(legacyDataDir, 'uploads'));
+  assert.equal(config.generatedDir, path.join(legacyDataDir, 'pages'));
+});

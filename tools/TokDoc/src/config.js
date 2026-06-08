@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const rootDir = path.resolve(__dirname, '..');
+const defaultRootDir = path.resolve(__dirname, '..');
 
 function boolEnv(value, fallback = false) {
   if (value == null || value === '') return fallback;
@@ -24,6 +24,21 @@ function envValue(env, primaryName, legacyName, fallback) {
   return fallback;
 }
 
+function resolveDataDir(env, appRootDir) {
+  const explicitDataDir = envValue(env, 'TOKDOC_DATA_DIR', 'TOKHTML_DATA_DIR', '');
+  if (explicitDataDir) return path.resolve(explicitDataDir);
+
+  const localDataDir = path.join(appRootDir, 'data');
+  const legacySiblingDataDir = path.resolve(appRootDir, '..', 'TokHtml', 'data');
+  const localTokdocDbPath = path.join(localDataDir, 'tokdoc.db');
+  const localLegacyDbPath = path.join(localDataDir, 'tokhtml.db');
+  const siblingLegacyDbPath = path.join(legacySiblingDataDir, 'tokhtml.db');
+  if (fs.existsSync(siblingLegacyDbPath) && !fs.existsSync(localTokdocDbPath) && !fs.existsSync(localLegacyDbPath)) {
+    return legacySiblingDataDir;
+  }
+  return localDataDir;
+}
+
 function resolveDbPath(env, dataDir) {
   const explicitPath = envValue(env, 'TOKDOC_DB_PATH', 'TOKHTML_DB_PATH', '');
   if (explicitPath) return path.resolve(explicitPath);
@@ -34,8 +49,9 @@ function resolveDbPath(env, dataDir) {
   return tokdocDbPath;
 }
 
-export function loadConfig(env = process.env) {
-  const dataDir = path.resolve(envValue(env, 'TOKDOC_DATA_DIR', 'TOKHTML_DATA_DIR', path.join(rootDir, 'data')));
+export function loadConfig(env = process.env, appRoot = defaultRootDir) {
+  const rootDir = path.resolve(appRoot);
+  const dataDir = resolveDataDir(env, rootDir);
   return {
     name: 'tokdoc',
     rootDir,

@@ -161,7 +161,11 @@ async function sendGeneratedPage(app, request, reply, rawSlug) {
 
 function currentSession(app, request) {
   const cookies = parseCookies(request.headers.cookie);
-  return app.store.verifySessionToken(cookies[sessionCookieName] || cookies[legacySessionCookieName]);
+  for (const token of [cookies[sessionCookieName], cookies[legacySessionCookieName]].filter(Boolean)) {
+    const session = app.store.verifySessionToken(token);
+    if (session) return session;
+  }
+  return null;
 }
 
 export function registerRoutes(app) {
