@@ -22,6 +22,9 @@ test('keeps the page list full width and moves watch directories into settings',
   assert.match(settingsDrawer, /id="addWatchDirectory"/);
   assert.match(settingsDrawer, /登录用户名/);
   assert.match(settingsDrawer, /登录密码/);
+  assert.match(settingsDrawer, /后台访问目录/);
+  assert.match(settingsDrawer, /id="adminPathInput"/);
+  assert.match(settingsDrawer, /id="currentPasswordInput"/);
   assert.match(settingsDrawer, /线上绑定/);
   assert.match(settingsDrawer, /id="remoteSyncEnabledInput"/);
   assert.match(settingsDrawer, /id="remoteSyncUrlInput"/);

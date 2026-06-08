@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { safeAdminPath } from './admin-path.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const defaultRootDir = path.resolve(__dirname, '..');
@@ -67,5 +68,6 @@ export function loadConfig(env = process.env, appRoot = defaultRootDir) {
     watchDirs: splitPaths(envValue(env, 'TOKDOC_WATCH_DIRS', 'TOKHTML_WATCH_DIRS', path.join(rootDir, 'html-inbox'))),
     allowSourceWrite: boolEnv(envValue(env, 'TOKDOC_ALLOW_SOURCE_WRITE', 'TOKHTML_ALLOW_SOURCE_WRITE', ''), false),
     officeConverterBin: envValue(env, 'TOKDOC_SOFFICE_BIN', 'TOKHTML_SOFFICE_BIN', 'soffice'),
+    adminPathOverride: env.TOKDOC_ADMIN_PATH ? safeAdminPath(env.TOKDOC_ADMIN_PATH) : '',
   };
 }

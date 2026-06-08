@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { defaultAdminPath, normalizeAdminPath } from './admin-path.js';
 import { injectEditBridge } from './edit-bridge.js';
 
 function sendNotFound(reply, message = 'Not found') {
@@ -118,23 +119,52 @@ function expiredSessionCookie(name = sessionCookieName) {
   return `${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`;
 }
 
-function isPublicRequest(request) {
+function normalizedPath(pathname) {
+  if (pathname === '/') return '/';
+  return String(pathname || '').replace(/\/+$/g, '') || '/';
+}
+
+function isActiveAdminPath(pathname, adminPath) {
+  return normalizedPath(pathname) === adminPath;
+}
+
+function isLegacyApiPath(pathname) {
+  return pathname === '/api' || pathname.startsWith('/api/');
+}
+
+function isScopedApiPath(pathname) {
+  return /^\/[^/]+\/api(?:\/|$)/.test(pathname);
+}
+
+function isActiveAdminApiPath(pathname, adminPath) {
+  return pathname === `${adminPath}/api` || pathname.startsWith(`${adminPath}/api/`);
+}
+
+function publicApiSuffix(pathname, adminPath) {
+  const suffix = pathname.startsWith(`${adminPath}/api`) ? pathname.slice(adminPath.length) : pathname;
+  return suffix === '/api/health' || suffix === '/api/session' || suffix === '/api/login';
+}
+
+function requestAccessState(app, request) {
   const url = new URL(request.url, 'http://tokdoc.local');
   const pathname = url.pathname;
+  const adminPath = app.store.getAdminPath();
+  const usingDefaultAdminPath = adminPath === defaultAdminPath;
   const isPublicPageView = pathname.startsWith('/pages/') && url.searchParams.get('edit') !== '1';
   const isPublicShortPageView = /^\/[a-z0-9]{6}$/.test(pathname) && url.searchParams.get('edit') !== '1';
-  return (
-    pathname === '/' ||
-    pathname === '/admin' ||
-    pathname === '/admin/' ||
-    pathname === '/favicon.ico' ||
-    pathname === '/api/health' ||
-    pathname === '/api/session' ||
-    pathname === '/api/login' ||
-    pathname.startsWith('/assets/') ||
-    isPublicShortPageView ||
-    isPublicPageView
-  );
+  if (pathname === '/favicon.ico' || pathname.startsWith('/assets/') || pathname.startsWith('/page-assets/')) return 'public';
+  if (pathname === '/' || pathname === '/admin' || pathname === '/admin/') return usingDefaultAdminPath ? 'public' : 'not-found';
+  if (isActiveAdminPath(pathname, adminPath)) return 'public';
+  if (isLegacyApiPath(pathname)) {
+    if (!usingDefaultAdminPath) return 'not-found';
+    return publicApiSuffix(pathname, adminPath) ? 'public' : 'protected';
+  }
+  if (isScopedApiPath(pathname)) {
+    if (!isActiveAdminApiPath(pathname, adminPath)) return 'not-found';
+    return publicApiSuffix(pathname, adminPath) ? 'public' : 'protected';
+  }
+  if (isPublicShortPageView || isPublicPageView) return 'public';
+  return 'protected';
 }
 
 async function sendGeneratedPage(app, request, reply, rawSlug) {
@@ -155,7 +185,7 @@ async function sendGeneratedPage(app, request, reply, rawSlug) {
       .send(buffer);
   }
   const html = await app.store.readPageHtml(page);
-  const output = request.query?.edit === '1' ? injectEditBridge(page, html) : html;
+  const output = request.query?.edit === '1' ? injectEditBridge(page, html, app.store.getAdminPath()) : html;
   return reply.header('cache-control', 'no-store').type('text/html; charset=utf-8').send(output);
 }
 
@@ -168,39 +198,24 @@ function currentSession(app, request) {
   return null;
 }
 
-export function registerRoutes(app) {
-  app.addHook('preHandler', async (request, reply) => {
-    if (isPublicRequest(request)) return;
-    const session = currentSession(app, request);
-    if (!session) return reply.code(401).send({ error: 'Unauthorized' });
-    request.auth = session;
-  });
+async function sendAdmin(app, reply) {
+  return reply.type('text/html').send(await fs.readFile(path.join(app.config.publicDir, 'index.html'), 'utf8'));
+}
 
-  app.get('/', async (request, reply) => reply.redirect('/admin'));
-
-  app.get('/admin', async (request, reply) => {
-    return reply.type('text/html').send(await fs.readFile(path.join(app.config.publicDir, 'index.html'), 'utf8'));
-  });
-
-  app.get('/admin/', async (request, reply) => {
-    return reply.type('text/html').send(await fs.readFile(path.join(app.config.publicDir, 'index.html'), 'utf8'));
-  });
-
-  app.get('/api/health', async () => ({
+function registerApiRoutes(app, prefix = '') {
+  app.get(`${prefix}/api/health`, async () => ({
     ok: true,
     name: 'tokdoc',
     time: new Date().toISOString(),
   }));
 
-  app.get('/favicon.ico', async (request, reply) => reply.code(204).send());
-
-  app.get('/api/session', async (request) => {
+  app.get(`${prefix}/api/session`, async (request) => {
     const session = currentSession(app, request);
     if (!session) return { authenticated: false };
     return { authenticated: true, username: session.username };
   });
 
-  app.post('/api/login', async (request, reply) => {
+  app.post(`${prefix}/api/login`, async (request, reply) => {
     const body = request.body || {};
     if (!app.store.verifyCredentials(body.username, body.password)) {
       return reply.code(401).send({ error: '用户名或密码错误' });
@@ -209,13 +224,13 @@ export function registerRoutes(app) {
     return reply.header('set-cookie', sessionCookie(token)).send({ authenticated: true, username: body.username });
   });
 
-  app.post('/api/logout', async (request, reply) => {
+  app.post(`${prefix}/api/logout`, async (request, reply) => {
     return reply
       .header('set-cookie', [expiredSessionCookie(), expiredSessionCookie(legacySessionCookieName)])
       .send({ authenticated: false });
   });
 
-  app.get('/api/pages', async (request) => {
+  app.get(`${prefix}/api/pages`, async (request) => {
     const result = app.store.listPagesPage(request.query || {});
     return {
       pages: result.pages.map(publicPage),
@@ -223,14 +238,14 @@ export function registerRoutes(app) {
     };
   });
 
-  app.get('/api/pages/:id', async (request, reply) => {
+  app.get(`${prefix}/api/pages/:id`, async (request, reply) => {
     const page = app.store.getPage(request.params.id);
     if (!page) return sendNotFound(reply, 'Page not found');
     const html = page.fileType === 'html' ? await app.store.readPageHtml(page) : '';
     return { page: publicPage(page), html };
   });
 
-  app.post('/api/pages/upload', async (request, reply) => {
+  app.post(`${prefix}/api/pages/upload`, async (request, reply) => {
     const files = [];
     const relativePaths = [];
     for await (const part of request.parts()) {
@@ -258,25 +273,42 @@ export function registerRoutes(app) {
     return reply.code(201).send({ pages: created.map(publicPage) });
   });
 
-  app.get('/api/settings', async () => ({
+  app.get(`${prefix}/api/settings`, async () => ({
     settings: app.store.getSettings(),
   }));
 
-  app.patch('/api/settings', async (request, reply) => {
+  app.patch(`${prefix}/api/settings`, async (request, reply) => {
     const body = request.body || {};
-    const settings = await app.store.saveSettings(body);
+    if (Object.hasOwn(body, 'adminPath')) {
+      let nextAdminPath;
+      try {
+        nextAdminPath = normalizeAdminPath(body.adminPath || defaultAdminPath);
+      } catch (error) {
+        return reply.code(400).send({ error: error.message });
+      }
+      if (nextAdminPath !== app.store.getAdminPath() && !app.store.verifyCredentials(request.auth?.username, body.currentPassword || '')) {
+        return reply.code(400).send({ error: '修改后台访问目录需要输入当前密码' });
+      }
+    }
+    let settings;
+    try {
+      settings = await app.store.saveSettings(body);
+    } catch (error) {
+      if (String(error.code || '').startsWith('ADMIN_PATH_')) return reply.code(400).send({ error: error.message });
+      throw error;
+    }
     if (Object.hasOwn(body, 'authUsername') || Object.hasOwn(body, 'authPassword')) {
       reply.header('set-cookie', sessionCookie(app.store.createSessionToken(settings.authUsername)));
     }
     return { settings };
   });
 
-  app.post('/api/pages/samples', async (request, reply) => {
+  app.post(`${prefix}/api/pages/samples`, async (request, reply) => {
     const pages = await app.store.addSamplePages();
     return reply.code(201).send({ pages: pages.map(publicPage) });
   });
 
-  app.patch('/api/pages/:id/content', async (request, reply) => {
+  app.patch(`${prefix}/api/pages/:id/content`, async (request, reply) => {
     try {
       const page = await app.store.savePageContent(request.params.id, request.body || {});
       return { page: publicPage(page) };
@@ -290,13 +322,13 @@ export function registerRoutes(app) {
     }
   });
 
-  app.delete('/api/pages/:id', async (request, reply) => {
+  app.delete(`${prefix}/api/pages/:id`, async (request, reply) => {
     const page = await app.store.deletePage(request.params.id);
     if (!page) return sendNotFound(reply, 'Page not found');
     return { page: publicPage(page) };
   });
 
-  app.post('/api/pages/:id/sync', async (request, reply) => {
+  app.post(`${prefix}/api/pages/:id/sync`, async (request, reply) => {
     try {
       const page = app.store.getPage(request.params.id);
       if (!page) return sendNotFound(reply, 'Page not found');
@@ -314,7 +346,7 @@ export function registerRoutes(app) {
     }
   });
 
-  app.post('/api/pages/:id/restore', async (request, reply) => {
+  app.post(`${prefix}/api/pages/:id/restore`, async (request, reply) => {
     try {
       const page = await app.store.restoreDeletedPage(request.params.id);
       if (!page) return sendNotFound(reply, 'Page not found');
@@ -325,13 +357,13 @@ export function registerRoutes(app) {
     }
   });
 
-  app.get('/api/pages/:id/versions', async (request, reply) => {
+  app.get(`${prefix}/api/pages/:id/versions`, async (request, reply) => {
     const page = app.store.getPage(request.params.id);
     if (!page) return sendNotFound(reply, 'Page not found');
     return { versions: app.store.listVersions(page.id) };
   });
 
-  app.post('/api/pages/:id/restore/:versionId', async (request, reply) => {
+  app.post(`${prefix}/api/pages/:id/restore/:versionId`, async (request, reply) => {
     try {
       const page = await app.store.restoreVersion(request.params.id, request.params.versionId);
       return { page: publicPage(page) };
@@ -341,11 +373,11 @@ export function registerRoutes(app) {
     }
   });
 
-  app.get('/api/watch-dirs', async () => ({
+  app.get(`${prefix}/api/watch-dirs`, async () => ({
     watchDirs: app.store.listWatchDirs(),
   }));
 
-  app.post('/api/watch-dirs', async (request, reply) => {
+  app.post(`${prefix}/api/watch-dirs`, async (request, reply) => {
     const body = request.body || {};
     if (!body.path) return reply.code(400).send({ error: 'path is required' });
     const watchDir = await app.store.addWatchDir({
@@ -359,14 +391,14 @@ export function registerRoutes(app) {
     return reply.code(201).send({ watchDir: scanned });
   });
 
-  app.delete('/api/watch-dirs/:id', async (request, reply) => {
+  app.delete(`${prefix}/api/watch-dirs/:id`, async (request, reply) => {
     const watchDir = await app.store.removeWatchDir(request.params.id);
     if (!watchDir) return sendNotFound(reply, 'Watch directory not found');
     await app.watchService.refresh();
     return { watchDir };
   });
 
-  app.post('/api/watch-dirs/:id/rescan', async (request, reply) => {
+  app.post(`${prefix}/api/watch-dirs/:id/rescan`, async (request, reply) => {
     try {
       const watchDir = await app.store.rescanWatchDir(request.params.id);
       return { watchDir };
@@ -374,12 +406,37 @@ export function registerRoutes(app) {
       return sendNotFound(reply, 'Watch directory not found');
     }
   });
+}
+
+export function registerRoutes(app) {
+  app.addHook('preHandler', async (request, reply) => {
+    const access = requestAccessState(app, request);
+    if (access === 'not-found') return sendNotFound(reply, 'Not found');
+    if (access === 'public') return;
+    const session = currentSession(app, request);
+    if (!session) return reply.code(401).send({ error: 'Unauthorized' });
+    request.auth = session;
+  });
+
+  app.get('/', async (request, reply) => reply.redirect(defaultAdminPath));
+  app.get('/admin', async (request, reply) => sendAdmin(app, reply));
+  app.get('/admin/', async (request, reply) => sendAdmin(app, reply));
+  app.get('/favicon.ico', async (request, reply) => reply.code(204).send());
+
+  registerApiRoutes(app);
+  registerApiRoutes(app, '/:adminPath');
 
   app.get('/pages/:slug', async (request, reply) => {
     return sendGeneratedPage(app, request, reply, request.params.slug);
   });
 
+  app.get('/:slug/', async (request, reply) => {
+    if (isActiveAdminPath(`/${request.params.slug}`, app.store.getAdminPath())) return sendAdmin(app, reply);
+    return sendNotFound(reply, 'Page not found');
+  });
+
   app.get('/:slug', async (request, reply) => {
+    if (isActiveAdminPath(`/${request.params.slug}`, app.store.getAdminPath())) return sendAdmin(app, reply);
     return sendGeneratedPage(app, request, reply, request.params.slug);
   });
 }

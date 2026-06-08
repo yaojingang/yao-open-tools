@@ -21,6 +21,7 @@ import {
   removeEditBridge,
   slugify,
 } from './html.js';
+import { defaultAdminPath, normalizeAdminPath, safeAdminPath } from './admin-path.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -493,6 +494,7 @@ export class PageStore {
     const settings = {
       trackingCode: '',
       authUsername: auth.authUsername,
+      adminPath: this.getAdminPath(),
       remoteSyncEnabled: false,
       remoteSyncUrl: '',
       remoteSyncHasToken: false,
@@ -531,6 +533,9 @@ export class PageStore {
       const password = String(settings.authPassword || '');
       if (password) this.setSetting('auth_password_hash', hashPassword(password), now);
     }
+    if (Object.prototype.hasOwnProperty.call(settings, 'adminPath')) {
+      this.setSetting('admin_path', normalizeAdminPath(settings.adminPath || defaultAdminPath), now);
+    }
     if (Object.prototype.hasOwnProperty.call(settings, 'remoteSyncEnabled')) {
       this.setSetting('remote_sync_enabled', settings.remoteSyncEnabled ? '1' : '0', now);
     }
@@ -555,6 +560,11 @@ export class PageStore {
 
   settingValue(key) {
     return this.db.prepare('SELECT value FROM settings WHERE key = ?').get(key)?.value || '';
+  }
+
+  getAdminPath() {
+    if (this.config.adminPathOverride) return safeAdminPath(this.config.adminPathOverride);
+    return safeAdminPath(this.settingValue('admin_path') || defaultAdminPath);
   }
 
   ensureAuthSettings() {

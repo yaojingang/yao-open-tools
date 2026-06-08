@@ -49,6 +49,7 @@ test('injectEditBridge uses a structured kami-style floating toolbar', () => {
   const html = injectEditBridge(
     { id: 'page-1', slug: 'f812c6', revision: 1 },
     '<!doctype html><html><head><title>页面</title></head><body><h1>页面</h1></body></html>',
+    '/ops-console',
   );
 
   assert.match(html, /tokdoc-edit-panel/);
@@ -75,7 +76,8 @@ test('injectEditBridge uses a structured kami-style floating toolbar', () => {
   assert.doesNotMatch(html, /event\.altKey/);
   assert.doesNotMatch(html, /Alt\/Option/);
   assert.match(html, /href="\/f812c6"/);
-  assert.match(html, /href="\/admin"/);
+  assert.match(html, /href="\/ops-console"/);
+  assert.match(html, /\/ops-console\/api\/pages\/page-1\/content/);
   assert.doesNotMatch(html, /href="\/">管理器/);
   assert.doesNotMatch(html, /href="\/pages\/f812c6\.html"/);
 });

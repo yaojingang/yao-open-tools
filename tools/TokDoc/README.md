@@ -53,7 +53,15 @@ Docker 镜像内置 LibreOffice Writer 和 Noto CJK 字体，用于把 `.doc/.do
 
 登录成功后会写入长期会话 Cookie，默认保持登录状态。可以在“设置”里修改登录用户名和密码；密码留空保存时不会覆盖当前密码。
 
-后台管理入口固定为 `/admin`。普通生成页面 `/<slug>` 不需要登录即可访问；在线编辑模式 `/<slug>?edit=1` 和所有管理 API 仍需要登录。旧格式 `/pages/<slug>.html` 会继续兼容访问。
+后台管理入口默认是 `/admin`，可在“设置”的“安全管理”里改成自定义单层目录，例如 `/tok-ops`。修改后台访问目录时需要输入当前密码；修改后旧 `/admin` 和固定 `/api/*` 管理接口会返回 404，只能通过新的 `/<后台目录>` 和 `/<后台目录>/api/*` 管理。普通生成页面 `/<slug>` 不需要登录即可访问；在线编辑模式 `/<slug>?edit=1` 仍需要后台登录态。旧格式 `/pages/<slug>.html` 会继续兼容访问。
+
+如果忘记了自定义后台目录，可以临时用环境变量覆盖恢复：
+
+```bash
+TOKDOC_ADMIN_PATH=/admin npm run dev
+```
+
+Docker 场景可在启动时临时附加同名环境变量。注意它是运行时覆盖项，设置后会优先于数据库里保存的后台目录。
 
 ## 使用方式
 
@@ -69,11 +77,11 @@ Docker 镜像内置 LibreOffice Writer 和 Noto CJK 字体，用于把 `.doc/.do
 10. 访问 `/<slug>` 或编辑地址时，会自动统计访问次数，并显示在列表“目录名称”后。
 11. 点击删除会把页面移入“回收站”，对应生成文件会移动到 `data/trash/` 下，原本的 `/<slug>` 不再可访问；在回收站里点击“恢复”可重新展示。
 12. 在“设置”的“线上绑定”里填写同类线上程序的 API 地址和 Token 后，页面列表可一键上传当前 HTML 到线上程序。PDF 和 Word 暂不支持线上同步。
-13. API 支持版本列表和恢复：
+13. API 支持版本列表和恢复，默认后台目录下的地址为：
 
 ```bash
-curl http://127.0.0.1:8080/api/pages/<pageId>/versions
-curl -X POST http://127.0.0.1:8080/api/pages/<pageId>/restore/<versionId>
+curl http://127.0.0.1:8080/admin/api/pages/<pageId>/versions
+curl -X POST http://127.0.0.1:8080/admin/api/pages/<pageId>/restore/<versionId>
 ```
 
 上传和目录扫描生成的文档 URL 会统一为：
@@ -91,26 +99,28 @@ data/pages/20260608-contract-a1b2c3.pdf
 
 ## API 摘要
 
-- `GET /api/health`
-- `GET /api/session`
-- `POST /api/login`
-- `POST /api/logout`
-- `GET /api/pages`
-- `POST /api/pages/upload`
-- `POST /api/pages/samples`
-- `GET /api/settings`
-- `PATCH /api/settings`
-- `GET /api/pages/:id`
-- `PATCH /api/pages/:id/content`
-- `POST /api/pages/:id/sync`
-- `DELETE /api/pages/:id`
-- `POST /api/pages/:id/restore`
-- `GET /api/pages/:id/versions`
-- `POST /api/pages/:id/restore/:versionId`
-- `GET /api/watch-dirs`
-- `POST /api/watch-dirs`
-- `DELETE /api/watch-dirs/:id`
-- `POST /api/watch-dirs/:id/rescan`
+后台 API 使用 `/<后台目录>/api/*`，默认后台目录是 `/admin`。未自定义后台目录时，旧的 `/api/*` 仍兼容；自定义后台目录后，旧 `/api/*` 会隐藏。
+
+- `GET /admin/api/health`
+- `GET /admin/api/session`
+- `POST /admin/api/login`
+- `POST /admin/api/logout`
+- `GET /admin/api/pages`
+- `POST /admin/api/pages/upload`
+- `POST /admin/api/pages/samples`
+- `GET /admin/api/settings`
+- `PATCH /admin/api/settings`
+- `GET /admin/api/pages/:id`
+- `PATCH /admin/api/pages/:id/content`
+- `POST /admin/api/pages/:id/sync`
+- `DELETE /admin/api/pages/:id`
+- `POST /admin/api/pages/:id/restore`
+- `GET /admin/api/pages/:id/versions`
+- `POST /admin/api/pages/:id/restore/:versionId`
+- `GET /admin/api/watch-dirs`
+- `POST /admin/api/watch-dirs`
+- `DELETE /admin/api/watch-dirs/:id`
+- `POST /admin/api/watch-dirs/:id/rescan`
 - `GET /:slug`
 - `GET /:slug?edit=1`
 - `GET /pages/:slug.html`：旧链接兼容

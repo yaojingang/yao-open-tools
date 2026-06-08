@@ -75,10 +75,12 @@ export const movableModuleSelector = [
   '.column',
 ].join(',');
 
-function bridgeScript(page) {
+function bridgeScript(page, adminPath = '/admin') {
+  const adminBase = String(adminPath || '/admin').replace(/\/+$/g, '') || '/admin';
   return `
 (function () {
-  const pageId = ${JSON.stringify(page.id)};
+  const adminBase = ${JSON.stringify(adminBase)};
+  const saveEndpoint = ${JSON.stringify(`${adminBase}/api/pages/${encodeURIComponent(page.id)}/content`)};
   let revision = ${Number(page.revision)};
   let saveTimer = null;
   let freeDrag = null;
@@ -522,7 +524,7 @@ function bridgeScript(page) {
   async function saveNow(manual) {
     window.clearTimeout(saveTimer);
     setStatus('保存中', 'saving');
-    const response = await fetch('/api/pages/' + encodeURIComponent(pageId) + '/content', {
+    const response = await fetch(saveEndpoint, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ html: cleanHtmlSnapshot(), revision, reason: manual ? 'manual' : 'autosave' }),
@@ -550,7 +552,7 @@ function bridgeScript(page) {
     const toolbar = document.createElement('div');
     toolbar.className = 'tokdoc-edit-panel';
     toolbar.setAttribute('data-tokdoc-bridge', 'toolbar');
-    toolbar.innerHTML = '<div class="tokdoc-edit-panel__brand"><strong>TokDoc</strong><span>页面内编辑</span></div><span class="tokdoc-edit-panel__status" data-tokdoc-status data-tone="saved">已保存</span><div class="tokdoc-edit-panel__actions"><button type="button" data-tokdoc-save>保存</button><a href="/${escapeHtml(page.slug)}">退出编辑</a><a href="/admin">管理器</a></div>';
+    toolbar.innerHTML = '<div class="tokdoc-edit-panel__brand"><strong>TokDoc</strong><span>页面内编辑</span></div><span class="tokdoc-edit-panel__status" data-tokdoc-status data-tone="saved">已保存</span><div class="tokdoc-edit-panel__actions"><button type="button" data-tokdoc-save>保存</button><a href="/${escapeHtml(page.slug)}">退出编辑</a><a href="${escapeHtml(adminBase)}">管理器</a></div>';
     document.body.append(toolbar);
     toolbar.querySelector('[data-tokdoc-save]').addEventListener('click', () => saveNow(true));
   }
@@ -574,7 +576,7 @@ function bridgeScript(page) {
 `;
 }
 
-export function injectEditBridge(page, html) {
+export function injectEditBridge(page, html, adminPath = '/admin') {
   const bridge = `
 <style data-tokdoc-bridge="style">
   .tokdoc-edit-panel,.tokdoc-edit-panel *{box-sizing:border-box}
@@ -605,7 +607,7 @@ export function injectEditBridge(page, html) {
   .tokdoc-module--free-dragging{outline:2px solid #1B365D!important;box-shadow:0 18px 42px rgba(20,20,19,.18)}
   .tokdoc-module--resizing{outline:2px solid #1B365D!important;box-shadow:0 18px 42px rgba(20,20,19,.18)}
 </style>
-<script data-tokdoc-bridge="script">${bridgeScript(page)}</script>`;
+<script data-tokdoc-bridge="script">${bridgeScript(page, adminPath)}</script>`;
   if (/<\/body>/i.test(html)) {
     return html.replace(/<\/body>/i, `${bridge}</body>`);
   }

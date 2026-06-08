@@ -19,7 +19,17 @@ const icons = {
 
 let pages = [];
 let watchDirectories = [];
-let settings = { trackingCode: '', authUsername: 'admin', remoteSyncEnabled: false, remoteSyncUrl: '', remoteSyncHasToken: false };
+const defaultSettings = {
+  trackingCode: '',
+  authUsername: 'admin',
+  adminPath: '/admin',
+  remoteSyncEnabled: false,
+  remoteSyncUrl: '',
+  remoteSyncHasToken: false,
+};
+
+let settings = { ...defaultSettings };
+let adminBasePath = normalizeAdminPath(window.location.pathname || defaultSettings.adminPath);
 let session = { authenticated: false, username: '' };
 let activeFilter = 'all';
 let currentPageId = null;
@@ -51,6 +61,8 @@ const els = {
   remoteSyncTokenInput: document.querySelector('#remoteSyncTokenInput'),
   authUsernameInput: document.querySelector('#authUsernameInput'),
   authPasswordInput: document.querySelector('#authPasswordInput'),
+  adminPathInput: document.querySelector('#adminPathInput'),
+  currentPasswordInput: document.querySelector('#currentPasswordInput'),
   authUserLabel: document.querySelector('#authUserLabel'),
   logoutButton: document.querySelector('#logoutButton'),
   loginBackdrop: document.querySelector('#loginBackdrop'),
@@ -61,8 +73,24 @@ const els = {
   toast: document.querySelector('#toast'),
 };
 
+function normalizeAdminPath(value) {
+  const raw = String(value || defaultSettings.adminPath).trim();
+  const candidate = raw.startsWith('/') ? raw : `/${raw}`;
+  return candidate.replace(/\/+$/g, '') || defaultSettings.adminPath;
+}
+
+function applySettings(nextSettings = {}) {
+  settings = { ...defaultSettings, ...nextSettings };
+  adminBasePath = normalizeAdminPath(settings.adminPath || adminBasePath);
+}
+
+function apiUrl(path) {
+  if (String(path).startsWith('/api/')) return `${adminBasePath}${path}`;
+  return path;
+}
+
 async function api(path, options = {}) {
-  const response = await fetch(path, { credentials: 'same-origin', ...options });
+  const response = await fetch(apiUrl(path), { credentials: 'same-origin', ...options });
   const isJson = response.headers.get('content-type')?.includes('application/json');
   const data = isJson ? await response.json() : await response.text();
   if (!response.ok) {
@@ -151,7 +179,7 @@ async function loadData() {
   pages = pageData.pages || [];
   pagination = { ...pagination, ...(pageData.pagination || {}) };
   watchDirectories = watchData.watchDirs || [];
-  settings = settingsData.settings || { trackingCode: '', authUsername: 'admin', remoteSyncEnabled: false, remoteSyncUrl: '', remoteSyncHasToken: false };
+  applySettings(settingsData.settings);
   render();
 }
 
@@ -213,6 +241,12 @@ function renderSettings() {
   }
   if (els.authPasswordInput && document.activeElement !== els.authPasswordInput) {
     els.authPasswordInput.value = '';
+  }
+  if (els.adminPathInput && document.activeElement !== els.adminPathInput) {
+    els.adminPathInput.value = settings.adminPath || '/admin';
+  }
+  if (els.currentPasswordInput && document.activeElement !== els.currentPasswordInput) {
+    els.currentPasswordInput.value = '';
   }
   if (els.remoteSyncEnabledInput) {
     els.remoteSyncEnabledInput.checked = Boolean(settings.remoteSyncEnabled);
@@ -424,6 +458,7 @@ async function syncPage(id) {
 }
 
 async function saveSettings() {
+  const previousAdminPath = adminBasePath;
   const watchPath = document.querySelector('#watchDirInput').value.trim();
   const trackingCode = els.trackingCodeInput?.value || '';
   const remoteSyncEnabled = Boolean(els.remoteSyncEnabledInput?.checked);
@@ -431,12 +466,14 @@ async function saveSettings() {
   const remoteSyncToken = els.remoteSyncTokenInput?.value || '';
   const authUsername = els.authUsernameInput?.value.trim() || 'admin';
   const authPassword = els.authPasswordInput?.value || '';
+  const adminPath = normalizeAdminPath(els.adminPathInput?.value || '/admin');
+  const currentPassword = els.currentPasswordInput?.value || '';
   const settingsResult = await api('/api/settings', {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ trackingCode, authUsername, authPassword, remoteSyncEnabled, remoteSyncUrl, remoteSyncToken }),
+    body: JSON.stringify({ trackingCode, authUsername, authPassword, adminPath, currentPassword, remoteSyncEnabled, remoteSyncUrl, remoteSyncToken }),
   });
-  settings = settingsResult.settings || settings;
+  applySettings(settingsResult.settings || settings);
   session = { authenticated: true, username: settings.authUsername || authUsername };
   if (watchPath) {
     await api('/api/watch-dirs', {
@@ -448,8 +485,14 @@ async function saveSettings() {
   await loadData();
   closeLayer(els.settingsBackdrop);
   if (els.authPasswordInput) els.authPasswordInput.value = '';
+  if (els.currentPasswordInput) els.currentPasswordInput.value = '';
   if (els.remoteSyncTokenInput) els.remoteSyncTokenInput.value = '';
-  showToast(watchPath ? '设置已保存，监听目录已扫描' : '设置已保存');
+  showToast(adminBasePath !== previousAdminPath ? `后台地址已更新：${adminBasePath}` : watchPath ? '设置已保存，监听目录已扫描' : '设置已保存');
+  if (adminBasePath !== previousAdminPath && normalizeAdminPath(window.location.pathname) !== adminBasePath) {
+    window.setTimeout(() => {
+      window.location.href = adminBasePath;
+    }, 700);
+  }
 }
 
 function showLogin(message = '') {

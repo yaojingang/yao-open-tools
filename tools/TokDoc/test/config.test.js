@@ -24,6 +24,13 @@ test('loads TokDoc defaults with new environment variable names', async (t) => {
   assert.deepEqual(config.watchDirs, [path.join(dataDir, 'watch-a')]);
   assert.equal(config.allowSourceWrite, true);
   assert.equal(config.officeConverterBin, '/usr/bin/soffice');
+  assert.equal(config.adminPathOverride, '');
+});
+
+test('loads a temporary admin path override from TOKDOC_ADMIN_PATH', () => {
+  const config = loadConfig({ TOKDOC_ADMIN_PATH: '/ops-console' });
+
+  assert.equal(config.adminPathOverride, '/ops-console');
 });
 
 test('keeps legacy TokHtml env and database paths compatible', async (t) => {

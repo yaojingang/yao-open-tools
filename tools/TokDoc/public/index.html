@@ -1864,6 +1864,21 @@
             <textarea id="trackingCodeInput" spellcheck="false" placeholder="<script>...</script>"></textarea>
             <p class="field-hint">保存后，新上传或新扫描生成的 HTML 会自动注入这段代码；系统会用 TokDoc 标记包裹，避免重复注入。</p>
           </div>
+          <section class="settings-section" aria-label="安全管理">
+            <div>
+              <h3 class="section-title">安全管理</h3>
+              <p class="section-note">自定义后台入口，减少固定管理地址暴露。</p>
+            </div>
+            <div class="field">
+              <label for="adminPathInput">后台访问目录</label>
+              <input id="adminPathInput" autocomplete="off" spellcheck="false" placeholder="/admin" />
+              <p class="field-hint">仅支持单层英文、数字、短横线或下划线，例如 /tok-ops；公开文档短链接不受影响。</p>
+            </div>
+            <div class="field">
+              <label for="currentPasswordInput">当前密码</label>
+              <input id="currentPasswordInput" type="password" autocomplete="current-password" placeholder="修改后台目录时需要填写" />
+            </div>
+          </section>
           <section class="settings-section" aria-label="线上绑定">
             <div>
               <h3 class="section-title">线上绑定</h3>

@@ -86,6 +86,94 @@ test('requires login for management APIs and keeps a long-lived session cookie',
   assert.match(logoutCookies, /tokhtml_session=.*Max-Age=0/);
 });
 
+test('moves the management console and APIs under a custom admin path', async (t) => {
+  const { app, dataDir } = await createApp();
+  t.after(async () => {
+    await app.close();
+    await fs.rm(dataDir, { recursive: true, force: true });
+  });
+
+  const login = await app.inject({
+    method: 'POST',
+    url: '/admin/api/login',
+    payload: { username: 'admin', password: 'tokdoc' },
+  });
+  assert.equal(login.statusCode, 200);
+  const cookie = sessionCookie(login);
+
+  const missingPassword = await app.inject({
+    method: 'PATCH',
+    url: '/admin/api/settings',
+    headers: { cookie },
+    payload: { adminPath: '/tok-ops' },
+  });
+  assert.equal(missingPassword.statusCode, 400);
+  assert.match(missingPassword.json().error, /当前密码/);
+
+  const reservedPath = await app.inject({
+    method: 'PATCH',
+    url: '/admin/api/settings',
+    headers: { cookie },
+    payload: { adminPath: '/api', currentPassword: 'tokdoc' },
+  });
+  assert.equal(reservedPath.statusCode, 400);
+
+  const saved = await app.inject({
+    method: 'PATCH',
+    url: '/admin/api/settings',
+    headers: { cookie },
+    payload: { adminPath: '/tok-ops', currentPassword: 'tokdoc' },
+  });
+  assert.equal(saved.statusCode, 200);
+  assert.equal(saved.json().settings.adminPath, '/tok-ops');
+
+  const hiddenRoot = await app.inject({ method: 'GET', url: '/' });
+  assert.equal(hiddenRoot.statusCode, 404);
+
+  const oldAdmin = await app.inject({ method: 'GET', url: '/admin' });
+  assert.equal(oldAdmin.statusCode, 404);
+
+  const oldLogin = await app.inject({
+    method: 'POST',
+    url: '/api/login',
+    payload: { username: 'admin', password: 'tokdoc' },
+  });
+  assert.equal(oldLogin.statusCode, 404);
+
+  const oldApi = await app.inject({ method: 'GET', url: '/api/pages', headers: { cookie } });
+  assert.equal(oldApi.statusCode, 404);
+
+  const customAdmin = await app.inject({ method: 'GET', url: '/tok-ops' });
+  assert.equal(customAdmin.statusCode, 200);
+  assert.match(customAdmin.body, /TokDoc 登录/);
+
+  const customLogin = await app.inject({
+    method: 'POST',
+    url: '/tok-ops/api/login',
+    payload: { username: 'admin', password: 'tokdoc' },
+  });
+  assert.equal(customLogin.statusCode, 200);
+  const customCookie = sessionCookie(customLogin);
+
+  const customPages = await app.inject({ method: 'GET', url: '/tok-ops/api/pages', headers: { cookie: customCookie } });
+  assert.equal(customPages.statusCode, 200);
+
+  const page = await app.store.importBuffer({
+    fileName: 'custom-admin-page.html',
+    relativePath: 'custom-admin-page.html',
+    buffer: Buffer.from('<!doctype html><html><head><title>自定义后台</title></head><body><h1>自定义后台</h1></body></html>'),
+  });
+
+  const publicView = await app.inject({ method: 'GET', url: page.url });
+  assert.equal(publicView.statusCode, 200);
+  assert.match(publicView.body, /自定义后台/);
+
+  const editView = await app.inject({ method: 'GET', url: `${page.url}?edit=1`, headers: { cookie: customCookie } });
+  assert.equal(editView.statusCode, 200);
+  assert.match(editView.body, new RegExp(`/tok-ops/api/pages/${page.id}/content`));
+  assert.match(editView.body, /href="\/tok-ops"/);
+});
+
 test('allows public generated page views but protects edit mode', async (t) => {
   const { app, dataDir } = await createApp();
   t.after(async () => {
