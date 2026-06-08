@@ -7,9 +7,9 @@ import test from 'node:test';
 import { buildApp } from '../src/server.js';
 
 async function createApp() {
-  const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tokhtml-auth-'));
+  const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tokdoc-auth-'));
   const config = {
-    name: 'tokhtml',
+    name: 'tokdoc',
     rootDir: dataDir,
     host: '127.0.0.1',
     port: 0,
@@ -31,6 +31,10 @@ function sessionCookie(response) {
   return raw?.split(';')[0] || '';
 }
 
+function legacySessionCookie(response) {
+  return sessionCookie(response).replace(/^tokdoc_session=/, 'tokhtml_session=');
+}
+
 test('requires login for management APIs and keeps a long-lived session cookie', async (t) => {
   const { app, dataDir } = await createApp();
   t.after(async () => {
@@ -44,7 +48,11 @@ test('requires login for management APIs and keeps a long-lived session cookie',
 
   const admin = await app.inject({ method: 'GET', url: '/admin' });
   assert.equal(admin.statusCode, 200);
-  assert.match(admin.body, /tokhtml 登录/);
+  assert.match(admin.body, /TokDoc 登录/);
+
+  const health = await app.inject({ method: 'GET', url: '/api/health' });
+  assert.equal(health.statusCode, 200);
+  assert.equal(health.json().name, 'tokdoc');
 
   const denied = await app.inject({ method: 'GET', url: '/api/pages' });
   assert.equal(denied.statusCode, 401);
@@ -52,14 +60,23 @@ test('requires login for management APIs and keeps a long-lived session cookie',
   const login = await app.inject({
     method: 'POST',
     url: '/api/login',
-    payload: { username: 'admin', password: 'tokhtml' },
+    payload: { username: 'admin', password: 'tokdoc' },
   });
   assert.equal(login.statusCode, 200);
-  assert.match(String(login.headers['set-cookie']), /tokhtml_session=/);
+  assert.match(String(login.headers['set-cookie']), /tokdoc_session=/);
   assert.match(String(login.headers['set-cookie']), /Max-Age=315360000/);
 
   const pages = await app.inject({ method: 'GET', url: '/api/pages', headers: { cookie: sessionCookie(login) } });
   assert.equal(pages.statusCode, 200);
+
+  const legacyPages = await app.inject({ method: 'GET', url: '/api/pages', headers: { cookie: legacySessionCookie(login) } });
+  assert.equal(legacyPages.statusCode, 200);
+
+  const logout = await app.inject({ method: 'POST', url: '/api/logout', headers: { cookie: sessionCookie(login) } });
+  assert.equal(logout.statusCode, 200);
+  const logoutCookies = String(logout.headers['set-cookie']);
+  assert.match(logoutCookies, /tokdoc_session=.*Max-Age=0/);
+  assert.match(logoutCookies, /tokhtml_session=.*Max-Age=0/);
 });
 
 test('allows public generated page views but protects edit mode', async (t) => {
@@ -90,11 +107,11 @@ test('allows public generated page views but protects edit mode', async (t) => {
   const login = await app.inject({
     method: 'POST',
     url: '/api/login',
-    payload: { username: 'admin', password: 'tokhtml' },
+    payload: { username: 'admin', password: 'tokdoc' },
   });
   const editAllowed = await app.inject({ method: 'GET', url: `${page.url}?edit=1`, headers: { cookie: sessionCookie(login) } });
   assert.equal(editAllowed.statusCode, 200);
-  assert.match(editAllowed.body, /tokhtml/);
+  assert.match(editAllowed.body, /tokdoc/);
 });
 
 test('serves uploaded PDF documents publicly and blocks edit mode for non-HTML assets', async (t) => {
@@ -119,12 +136,12 @@ test('serves uploaded PDF documents publicly and blocks edit mode for non-HTML a
   const login = await app.inject({
     method: 'POST',
     url: '/api/login',
-    payload: { username: 'admin', password: 'tokhtml' },
+    payload: { username: 'admin', password: 'tokdoc' },
   });
   const editDenied = await app.inject({ method: 'GET', url: `${page.url}?edit=1`, headers: { cookie: sessionCookie(login) } });
   assert.equal(editDenied.statusCode, 400);
   assert.equal(editDenied.json().error, 'Document assets cannot be edited online');
-  assert.doesNotMatch(editDenied.body, /tokhtml-edit-panel/);
+  assert.doesNotMatch(editDenied.body, /tokdoc-edit-panel/);
 });
 
 test('allows changing login username and password from settings', async (t) => {
@@ -137,7 +154,7 @@ test('allows changing login username and password from settings', async (t) => {
   const login = await app.inject({
     method: 'POST',
     url: '/api/login',
-    payload: { username: 'admin', password: 'tokhtml' },
+    payload: { username: 'admin', password: 'tokdoc' },
   });
   const cookie = sessionCookie(login);
 
@@ -155,7 +172,7 @@ test('allows changing login username and password from settings', async (t) => {
   const oldLogin = await app.inject({
     method: 'POST',
     url: '/api/login',
-    payload: { username: 'admin', password: 'tokhtml' },
+    payload: { username: 'admin', password: 'tokdoc' },
   });
   assert.equal(oldLogin.statusCode, 401);
 
@@ -177,7 +194,7 @@ test('hides deleted generated pages until they are restored from the recycle bin
   const login = await app.inject({
     method: 'POST',
     url: '/api/login',
-    payload: { username: 'admin', password: 'tokhtml' },
+    payload: { username: 'admin', password: 'tokdoc' },
   });
   const cookie = sessionCookie(login);
   const page = await app.store.importBuffer({
@@ -239,7 +256,7 @@ test('syncs a generated page to a bound online endpoint', async (t) => {
   const login = await app.inject({
     method: 'POST',
     url: '/api/login',
-    payload: { username: 'admin', password: 'tokhtml' },
+    payload: { username: 'admin', password: 'tokdoc' },
   });
   const cookie = sessionCookie(login);
   const page = await app.store.importBuffer({
@@ -276,6 +293,8 @@ test('syncs a generated page to a bound online endpoint', async (t) => {
   assert.equal(received[0].method, 'POST');
   assert.equal(received[0].url, '/api/import');
   assert.equal(received[0].authorization, 'Bearer secret-token');
+  assert.equal(received[0].body.source, 'tokdoc');
+  assert.equal(received[0].body.legacySource, 'tokhtml');
   assert.equal(received[0].body.page.id, page.id);
   assert.equal(received[0].body.page.slug, page.slug);
   assert.equal(received[0].body.page.title, '线上同步');

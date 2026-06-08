@@ -78,4 +78,4 @@ zip -qr ../dist/toktra-0.4.8-chrome-web-store.zip . -x '*.DS_Store'
 
 ## 参考逻辑
 
-toktra 借鉴了 `tokhtml` 的同页 HTML 桥接思路：先排除插件自身和不可编辑/不可处理区域，再对页面文本块做标记和处理。不同点是 toktra 不改写原 HTML 文本，而是把译文作为独立节点渲染在原文附近。
+toktra 借鉴了 TokDoc（原 TokHtml）的同页 HTML 桥接思路：先排除插件自身和不可编辑/不可处理区域，再对页面文本块做标记和处理。不同点是 toktra 不改写原 HTML 文本，而是把译文作为独立节点渲染在原文附近。

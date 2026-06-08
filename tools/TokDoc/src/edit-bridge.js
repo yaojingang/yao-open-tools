@@ -86,11 +86,11 @@ function bridgeScript(page) {
   let activeModule = null;
   const selectors = ${JSON.stringify(editableElementSelector)};
   const moduleSelectors = ${JSON.stringify(movableModuleSelector)};
-  const ignoredSelector = '[data-tokhtml-bridge],script,style,noscript,textarea,input,select,option,svg,canvas,iframe,video,audio';
-  const moduleIgnoredSelector = '[data-tokhtml-bridge],script,style,noscript,textarea,input,select,option';
+  const ignoredSelector = '[data-tokdoc-bridge],[data-tokhtml-bridge],script,style,noscript,textarea,input,select,option,svg,canvas,iframe,video,audio';
+  const moduleIgnoredSelector = '[data-tokdoc-bridge],[data-tokhtml-bridge],script,style,noscript,textarea,input,select,option';
 
   function setStatus(text, tone) {
-    const status = document.querySelector('[data-tokhtml-status]');
+    const status = document.querySelector('[data-tokdoc-status]');
     if (!status) return;
     status.textContent = text;
     status.dataset.tone = tone || 'idle';
@@ -98,7 +98,7 @@ function bridgeScript(page) {
 
   function editableNodes() {
     const candidates = Array.from(document.body.querySelectorAll(selectors))
-      .filter((node) => !node.closest('[data-tokhtml-bridge]'))
+      .filter((node) => !node.closest('[data-tokdoc-bridge],[data-tokhtml-bridge]'))
       .filter((node) => !node.closest(ignoredSelector))
       .filter((node) => Array.from(node.childNodes).some((child) => child.nodeType === Node.TEXT_NODE && child.textContent.trim()));
     return candidates.reduce((selected, node) => {
@@ -110,8 +110,8 @@ function bridgeScript(page) {
   function enableEditing() {
     editableNodes().forEach((node) => {
       node.setAttribute('contenteditable', 'true');
-      node.setAttribute('data-tokhtml-editable', 'true');
-      node.classList.add('tokhtml-editable');
+      node.setAttribute('data-tokdoc-editable', 'true');
+      node.classList.add('tokdoc-editable');
     });
   }
 
@@ -172,8 +172,8 @@ function bridgeScript(page) {
     if (!node.style.width) node.style.width = styleWidthFromBorderBox(node, position.width) + 'px';
     if (!node.style.zIndex) node.style.zIndex = '10';
     placeNodeAt(node, position.left, position.top);
-    node.setAttribute('data-tokhtml-free-positioned', 'true');
-    node.classList.add('tokhtml-module--free-positioned', 'tokhtml-module--free-dragging');
+    node.setAttribute('data-tokdoc-free-positioned', 'true');
+    node.classList.add('tokdoc-module--free-positioned', 'tokdoc-module--free-dragging');
     freeDrag = {
       node,
       handle,
@@ -195,9 +195,9 @@ function bridgeScript(page) {
     node.style.bottom = 'auto';
     placeNodeAt(node, position.left, position.top);
     node.style.width = styleWidthFromBorderBox(node, position.width) + 'px';
-    node.setAttribute('data-tokhtml-module', 'true');
-    node.setAttribute('data-tokhtml-free-positioned', 'true');
-    node.classList.add('tokhtml-draggable-module', 'tokhtml-module--free-positioned');
+    node.setAttribute('data-tokdoc-module', 'true');
+    node.setAttribute('data-tokdoc-free-positioned', 'true');
+    node.classList.add('tokdoc-draggable-module', 'tokdoc-module--free-positioned');
     return {
       left: position.left,
       top: position.top,
@@ -218,7 +218,7 @@ function bridgeScript(page) {
   function finishFreeDrag() {
     if (!freeDrag) return;
     const current = freeDrag;
-    current.node.classList.remove('tokhtml-module--free-dragging');
+    current.node.classList.remove('tokdoc-module--free-dragging');
     if (current.handle.releasePointerCapture && current.pointerId !== undefined) {
       try {
         current.handle.releasePointerCapture(current.pointerId);
@@ -235,11 +235,11 @@ function bridgeScript(page) {
     event.stopPropagation();
     const position = prepareAbsoluteEdit(node);
     node.style.height = styleHeightFromBorderBox(node, position.height) + 'px';
-    node.classList.add('tokhtml-module--resizing');
+    node.classList.add('tokdoc-module--resizing');
     resizeDrag = {
       node,
       handle,
-      direction: handle.dataset.tokhtmlResizeHandle,
+      direction: handle.dataset.tokdocResizeHandle,
       startX: event.clientX,
       startY: event.clientY,
       startLeft: position.left,
@@ -295,7 +295,7 @@ function bridgeScript(page) {
   function finishResizeDrag() {
     if (!resizeDrag) return;
     const current = resizeDrag;
-    current.node.classList.remove('tokhtml-module--resizing');
+    current.node.classList.remove('tokdoc-module--resizing');
     if (current.handle.releasePointerCapture && current.pointerId !== undefined) {
       try {
         current.handle.releasePointerCapture(current.pointerId);
@@ -308,8 +308,8 @@ function bridgeScript(page) {
   }
 
   function resetFreePosition(node) {
-    node.removeAttribute('data-tokhtml-free-positioned');
-    node.classList.remove('tokhtml-module--free-positioned', 'tokhtml-module--free-dragging', 'tokhtml-module--resizing');
+    node.removeAttribute('data-tokdoc-free-positioned');
+    node.classList.remove('tokdoc-module--free-positioned', 'tokdoc-module--free-dragging', 'tokdoc-module--resizing');
     ['position', 'left', 'top', 'right', 'bottom', 'width', 'height', 'zIndex'].forEach((property) => {
       node.style[property] = '';
     });
@@ -319,7 +319,7 @@ function bridgeScript(page) {
   function validModule(node) {
     if (!node || node === document.body || node === document.documentElement) return false;
     if (!node.matches || !node.matches(moduleSelectors)) return false;
-    if (node.closest('[data-tokhtml-bridge]') || node.closest(moduleIgnoredSelector)) return false;
+    if (node.closest('[data-tokdoc-bridge],[data-tokhtml-bridge]') || node.closest(moduleIgnoredSelector)) return false;
     const rect = node.getBoundingClientRect();
     if (rect.width < 12 || rect.height < 12) return false;
     return !!(
@@ -335,7 +335,7 @@ function bridgeScript(page) {
   }
 
   function clearActiveModule() {
-    if (activeModule) activeModule.classList.remove('tokhtml-adjustable-active');
+    if (activeModule) activeModule.classList.remove('tokdoc-adjustable-active');
     activeModule = null;
   }
 
@@ -344,8 +344,8 @@ function bridgeScript(page) {
   }
 
   function positionModuleControls(node) {
-    const handle = document.querySelector('[data-tokhtml-free-handle]');
-    const resizeHandles = Array.from(document.querySelectorAll('[data-tokhtml-resize-handle]'));
+    const handle = document.querySelector('[data-tokdoc-free-handle]');
+    const resizeHandles = Array.from(document.querySelectorAll('[data-tokdoc-resize-handle]'));
     if (!handle || !node) return;
     const rect = node.getBoundingClientRect();
     const inset = 6;
@@ -368,7 +368,7 @@ function bridgeScript(page) {
     handle.dataset.placement = placement;
     resizeHandles.forEach((resizeHandle) => {
       const edge = 6;
-      const direction = resizeHandle.dataset.tokhtmlResizeHandle;
+      const direction = resizeHandle.dataset.tokdocResizeHandle;
       resizeHandle.hidden = false;
       if (direction === 'right') {
         resizeHandle.style.left = Math.round(clamp(rect.right - edge - inset, margin, window.innerWidth - edge - margin)) + 'px';
@@ -398,24 +398,24 @@ function bridgeScript(page) {
   }
 
   function showModuleHandle(node) {
-    const handle = document.querySelector('[data-tokhtml-free-handle]');
+    const handle = document.querySelector('[data-tokdoc-free-handle]');
     if (!handle || !node) return;
     if (activeModule !== node) {
       clearActiveModule();
       activeModule = node;
-      activeModule.classList.add('tokhtml-adjustable-active');
+      activeModule.classList.add('tokdoc-adjustable-active');
     }
     positionModuleControls(node);
     handle.hidden = false;
   }
 
   function handleModuleHover(event) {
-    if (freeDrag || resizeDrag || (event.target && event.target.closest('[data-tokhtml-bridge]'))) return;
+    if (freeDrag || resizeDrag || (event.target && event.target.closest('[data-tokdoc-bridge],[data-tokhtml-bridge]'))) return;
     const node = smallestModuleAt(event.clientX, event.clientY);
-    const handle = document.querySelector('[data-tokhtml-free-handle]');
+    const handle = document.querySelector('[data-tokdoc-free-handle]');
     if (!node) {
       if (handle) handle.hidden = true;
-      document.querySelectorAll('[data-tokhtml-resize-handle]').forEach((resizeHandle) => { resizeHandle.hidden = true; });
+      document.querySelectorAll('[data-tokdoc-resize-handle]').forEach((resizeHandle) => { resizeHandle.hidden = true; });
       clearActiveModule();
       return;
     }
@@ -423,7 +423,7 @@ function bridgeScript(page) {
   }
 
   function repositionModuleControls() {
-    const handle = document.querySelector('[data-tokhtml-free-handle]');
+    const handle = document.querySelector('[data-tokdoc-free-handle]');
     if (!handle || handle.hidden || !activeModule) return;
     positionModuleControls(activeModule);
   }
@@ -456,16 +456,16 @@ function bridgeScript(page) {
     handle.type = 'button';
     handle.hidden = true;
     handle.contentEditable = 'false';
-    handle.className = 'tokhtml-module-handle';
-    handle.setAttribute('data-tokhtml-bridge', 'drag-handle');
-    handle.setAttribute('data-tokhtml-free-handle', 'true');
+    handle.className = 'tokdoc-module-handle';
+    handle.setAttribute('data-tokdoc-bridge', 'drag-handle');
+    handle.setAttribute('data-tokdoc-free-handle', 'true');
     handle.setAttribute('aria-label', '拖动调整当前模块');
     handle.title = '拖动调整当前模块；双击还原定位';
     handle.textContent = '↔';
     handle.addEventListener('pointerdown', (event) => {
       if (event.button !== 0 || !activeModule) return;
-      activeModule.setAttribute('data-tokhtml-module', 'true');
-      activeModule.classList.add('tokhtml-draggable-module');
+      activeModule.setAttribute('data-tokdoc-module', 'true');
+      activeModule.classList.add('tokdoc-draggable-module');
       startFreeDrag(activeModule, handle, event);
     });
     handle.addEventListener('dblclick', (event) => {
@@ -478,9 +478,9 @@ function bridgeScript(page) {
       const resizeHandle = document.createElement('span');
       resizeHandle.hidden = true;
       resizeHandle.contentEditable = 'false';
-      resizeHandle.className = 'tokhtml-resize-handle tokhtml-resize-handle--' + direction;
-      resizeHandle.setAttribute('data-tokhtml-bridge', 'resize-handle');
-      resizeHandle.setAttribute('data-tokhtml-resize-handle', direction);
+      resizeHandle.className = 'tokdoc-resize-handle tokdoc-resize-handle--' + direction;
+      resizeHandle.setAttribute('data-tokdoc-bridge', 'resize-handle');
+      resizeHandle.setAttribute('data-tokdoc-resize-handle', direction);
       resizeHandle.setAttribute('aria-hidden', 'true');
       resizeHandle.addEventListener('pointerdown', (event) => {
         if (event.button !== 0 || !activeModule) return;
@@ -492,24 +492,29 @@ function bridgeScript(page) {
 
   function cleanHtmlSnapshot() {
     const clone = document.documentElement.cloneNode(true);
-    clone.querySelectorAll('[data-tokhtml-bridge]').forEach((node) => node.remove());
-    clone.querySelectorAll('.tokhtml-adjustable-active').forEach((node) => node.classList.remove('tokhtml-adjustable-active'));
-    clone.querySelectorAll('[data-tokhtml-module]').forEach((node) => {
+    clone.querySelectorAll('[data-tokdoc-bridge],[data-tokhtml-bridge]').forEach((node) => node.remove());
+    clone.querySelectorAll('.tokdoc-adjustable-active,.tokhtml-adjustable-active').forEach((node) => {
+      node.classList.remove('tokdoc-adjustable-active', 'tokhtml-adjustable-active');
+    });
+    clone.querySelectorAll('[data-tokdoc-module],[data-tokhtml-module]').forEach((node) => {
       normalizeFreePositionedStyle(node);
+      node.removeAttribute('data-tokdoc-module');
+      node.removeAttribute('data-tokdoc-free-positioned');
       node.removeAttribute('data-tokhtml-module');
       node.removeAttribute('data-tokhtml-free-positioned');
       node.removeAttribute('draggable');
-      node.classList.remove('tokhtml-draggable-module');
-      node.classList.remove('tokhtml-module--dragging');
-      node.classList.remove('tokhtml-module--drop-target');
-      node.classList.remove('tokhtml-module--free-positioned');
-      node.classList.remove('tokhtml-module--free-dragging');
-      node.classList.remove('tokhtml-module--resizing');
+      node.classList.remove('tokdoc-draggable-module', 'tokhtml-draggable-module');
+      node.classList.remove('tokdoc-module--dragging', 'tokhtml-module--dragging');
+      node.classList.remove('tokdoc-module--drop-target', 'tokhtml-module--drop-target');
+      node.classList.remove('tokdoc-module--free-positioned', 'tokhtml-module--free-positioned');
+      node.classList.remove('tokdoc-module--free-dragging', 'tokhtml-module--free-dragging');
+      node.classList.remove('tokdoc-module--resizing', 'tokhtml-module--resizing');
     });
-    clone.querySelectorAll('[data-tokhtml-editable]').forEach((node) => {
+    clone.querySelectorAll('[data-tokdoc-editable],[data-tokhtml-editable]').forEach((node) => {
       node.removeAttribute('contenteditable');
+      node.removeAttribute('data-tokdoc-editable');
       node.removeAttribute('data-tokhtml-editable');
-      node.classList.remove('tokhtml-editable');
+      node.classList.remove('tokdoc-editable', 'tokhtml-editable');
     });
     return '<!doctype html>\\n' + clone.outerHTML;
   }
@@ -543,11 +548,11 @@ function bridgeScript(page) {
 
   function mountToolbar() {
     const toolbar = document.createElement('div');
-    toolbar.className = 'tokhtml-edit-panel';
-    toolbar.setAttribute('data-tokhtml-bridge', 'toolbar');
-    toolbar.innerHTML = '<div class="tokhtml-edit-panel__brand"><strong>tokhtml</strong><span>页面内编辑</span></div><span class="tokhtml-edit-panel__status" data-tokhtml-status data-tone="saved">已保存</span><div class="tokhtml-edit-panel__actions"><button type="button" data-tokhtml-save>保存</button><a href="/${escapeHtml(page.slug)}">退出编辑</a><a href="/admin">管理器</a></div>';
+    toolbar.className = 'tokdoc-edit-panel';
+    toolbar.setAttribute('data-tokdoc-bridge', 'toolbar');
+    toolbar.innerHTML = '<div class="tokdoc-edit-panel__brand"><strong>TokDoc</strong><span>页面内编辑</span></div><span class="tokdoc-edit-panel__status" data-tokdoc-status data-tone="saved">已保存</span><div class="tokdoc-edit-panel__actions"><button type="button" data-tokdoc-save>保存</button><a href="/${escapeHtml(page.slug)}">退出编辑</a><a href="/admin">管理器</a></div>';
     document.body.append(toolbar);
-    toolbar.querySelector('[data-tokhtml-save]').addEventListener('click', () => saveNow(true));
+    toolbar.querySelector('[data-tokdoc-save]').addEventListener('click', () => saveNow(true));
   }
 
   mountToolbar();
@@ -563,7 +568,7 @@ function bridgeScript(page) {
   window.addEventListener('scroll', repositionModuleControls, true);
   window.addEventListener('resize', repositionModuleControls);
   document.addEventListener('input', (event) => {
-    if (event.target && event.target.closest('[data-tokhtml-editable]')) scheduleSave();
+    if (event.target && event.target.closest('[data-tokdoc-editable]')) scheduleSave();
   });
 })();
 `;
@@ -571,36 +576,36 @@ function bridgeScript(page) {
 
 export function injectEditBridge(page, html) {
   const bridge = `
-<style data-tokhtml-bridge="style">
-  .tokhtml-edit-panel,.tokhtml-edit-panel *{box-sizing:border-box}
-  .tokhtml-edit-panel{position:fixed;right:22px;bottom:22px;z-index:2147483647;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;width:min(386px,calc(100vw - 32px));padding:14px;border:1px solid #d1cfc5;border-radius:8px;background:#faf9f5;color:#141413;box-shadow:0 18px 46px rgba(20,20,19,.18),inset 0 1px 0 #fff;font:13px/1.35 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;letter-spacing:0}
-  .tokhtml-edit-panel__brand{min-width:0;padding-left:10px;border-left:3px solid #1B365D}
-  .tokhtml-edit-panel__brand strong{display:block;overflow:hidden;color:#1B365D;font-family:"Songti SC","STSong",Georgia,serif;font-size:18px;font-weight:600;line-height:1.15;text-overflow:ellipsis;white-space:nowrap}
-  .tokhtml-edit-panel__brand span{display:block;margin-top:3px;color:#5e5d59;font-size:12px;line-height:1.35}
-  .tokhtml-edit-panel__status{align-self:start;min-height:28px;padding:5px 10px;border-radius:999px;background:#edf3ea;color:#365f45;font-size:12px;font-weight:600;white-space:nowrap}
-  .tokhtml-edit-panel__status[data-tone="saving"]{background:#f4ead8;color:#805a23}
-  .tokhtml-edit-panel__status[data-tone="error"]{background:#f3e1dc;color:#9f3430}
-  .tokhtml-edit-panel__actions{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-  .tokhtml-edit-panel__actions button,.tokhtml-edit-panel__actions a{display:inline-flex;align-items:center;justify-content:center;height:34px;min-width:0;padding:0 10px;border:1px solid #e8e5da;border-radius:7px;background:#fffefa;color:#1B365D;text-decoration:none;cursor:pointer;font:600 13px/1 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;white-space:nowrap}
-  .tokhtml-edit-panel__actions button:hover,.tokhtml-edit-panel__actions a:hover{border-color:#d1cfc5;background:#f2f0e7}
-  @media (max-width:520px){.tokhtml-edit-panel{right:12px;bottom:12px;width:calc(100vw - 24px)}.tokhtml-edit-panel__actions{grid-template-columns:1fr}.tokhtml-edit-panel__actions button,.tokhtml-edit-panel__actions a{height:36px}}
-  .tokhtml-editable{outline:1px dashed transparent;outline-offset:3px;transition:outline-color .15s ease,background .15s ease}
-  .tokhtml-editable:hover{outline-color:#9db4d0;background:rgba(238,242,247,.55)}
-  .tokhtml-editable:focus{outline:2px solid #1B365D;background:rgba(238,242,247,.85)}
-  .tokhtml-module-handle{position:fixed;z-index:2147483646;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;border:1px solid #d1cfc5;border-radius:7px;background:#faf9f5;color:#1B365D;box-shadow:0 10px 24px rgba(20,20,19,.16);cursor:move;font:700 15px/1 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;transition:transform .12s ease,opacity .12s ease}
-  .tokhtml-module-handle[hidden]{display:none}
-  .tokhtml-module-handle:active{transform:scale(.96)}
-  .tokhtml-resize-handle{position:fixed;z-index:2147483645;display:block;border-radius:999px;background:rgba(27,54,93,.26);box-shadow:0 0 0 1px rgba(250,249,245,.72);transition:background .12s ease,opacity .12s ease}
-  .tokhtml-resize-handle[hidden]{display:none}
-  .tokhtml-resize-handle:hover{background:rgba(27,54,93,.46)}
-  .tokhtml-resize-handle--left,.tokhtml-resize-handle--right{cursor:ew-resize}
-  .tokhtml-resize-handle--top,.tokhtml-resize-handle--bottom{cursor:ns-resize}
-  .tokhtml-adjustable-active{outline:1px dashed rgba(27,54,93,.42)!important;outline-offset:4px}
-  .tokhtml-module--free-positioned{outline:1px solid rgba(27,54,93,.28);outline-offset:4px}
-  .tokhtml-module--free-dragging{outline:2px solid #1B365D!important;box-shadow:0 18px 42px rgba(20,20,19,.18)}
-  .tokhtml-module--resizing{outline:2px solid #1B365D!important;box-shadow:0 18px 42px rgba(20,20,19,.18)}
+<style data-tokdoc-bridge="style">
+  .tokdoc-edit-panel,.tokdoc-edit-panel *{box-sizing:border-box}
+  .tokdoc-edit-panel{position:fixed;right:22px;bottom:22px;z-index:2147483647;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;width:min(386px,calc(100vw - 32px));padding:14px;border:1px solid #d1cfc5;border-radius:8px;background:#faf9f5;color:#141413;box-shadow:0 18px 46px rgba(20,20,19,.18),inset 0 1px 0 #fff;font:13px/1.35 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;letter-spacing:0}
+  .tokdoc-edit-panel__brand{min-width:0;padding-left:10px;border-left:3px solid #1B365D}
+  .tokdoc-edit-panel__brand strong{display:block;overflow:hidden;color:#1B365D;font-family:"Songti SC","STSong",Georgia,serif;font-size:18px;font-weight:600;line-height:1.15;text-overflow:ellipsis;white-space:nowrap}
+  .tokdoc-edit-panel__brand span{display:block;margin-top:3px;color:#5e5d59;font-size:12px;line-height:1.35}
+  .tokdoc-edit-panel__status{align-self:start;min-height:28px;padding:5px 10px;border-radius:999px;background:#edf3ea;color:#365f45;font-size:12px;font-weight:600;white-space:nowrap}
+  .tokdoc-edit-panel__status[data-tone="saving"]{background:#f4ead8;color:#805a23}
+  .tokdoc-edit-panel__status[data-tone="error"]{background:#f3e1dc;color:#9f3430}
+  .tokdoc-edit-panel__actions{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .tokdoc-edit-panel__actions button,.tokdoc-edit-panel__actions a{display:inline-flex;align-items:center;justify-content:center;height:34px;min-width:0;padding:0 10px;border:1px solid #e8e5da;border-radius:7px;background:#fffefa;color:#1B365D;text-decoration:none;cursor:pointer;font:600 13px/1 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;white-space:nowrap}
+  .tokdoc-edit-panel__actions button:hover,.tokdoc-edit-panel__actions a:hover{border-color:#d1cfc5;background:#f2f0e7}
+  @media (max-width:520px){.tokdoc-edit-panel{right:12px;bottom:12px;width:calc(100vw - 24px)}.tokdoc-edit-panel__actions{grid-template-columns:1fr}.tokdoc-edit-panel__actions button,.tokdoc-edit-panel__actions a{height:36px}}
+  .tokdoc-editable{outline:1px dashed transparent;outline-offset:3px;transition:outline-color .15s ease,background .15s ease}
+  .tokdoc-editable:hover{outline-color:#9db4d0;background:rgba(238,242,247,.55)}
+  .tokdoc-editable:focus{outline:2px solid #1B365D;background:rgba(238,242,247,.85)}
+  .tokdoc-module-handle{position:fixed;z-index:2147483646;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;border:1px solid #d1cfc5;border-radius:7px;background:#faf9f5;color:#1B365D;box-shadow:0 10px 24px rgba(20,20,19,.16);cursor:move;font:700 15px/1 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;transition:transform .12s ease,opacity .12s ease}
+  .tokdoc-module-handle[hidden]{display:none}
+  .tokdoc-module-handle:active{transform:scale(.96)}
+  .tokdoc-resize-handle{position:fixed;z-index:2147483645;display:block;border-radius:999px;background:rgba(27,54,93,.26);box-shadow:0 0 0 1px rgba(250,249,245,.72);transition:background .12s ease,opacity .12s ease}
+  .tokdoc-resize-handle[hidden]{display:none}
+  .tokdoc-resize-handle:hover{background:rgba(27,54,93,.46)}
+  .tokdoc-resize-handle--left,.tokdoc-resize-handle--right{cursor:ew-resize}
+  .tokdoc-resize-handle--top,.tokdoc-resize-handle--bottom{cursor:ns-resize}
+  .tokdoc-adjustable-active{outline:1px dashed rgba(27,54,93,.42)!important;outline-offset:4px}
+  .tokdoc-module--free-positioned{outline:1px solid rgba(27,54,93,.28);outline-offset:4px}
+  .tokdoc-module--free-dragging{outline:2px solid #1B365D!important;box-shadow:0 18px 42px rgba(20,20,19,.18)}
+  .tokdoc-module--resizing{outline:2px solid #1B365D!important;box-shadow:0 18px 42px rgba(20,20,19,.18)}
 </style>
-<script data-tokhtml-bridge="script">${bridgeScript(page)}</script>`;
+<script data-tokdoc-bridge="script">${bridgeScript(page)}</script>`;
   if (/<\/body>/i.test(html)) {
     return html.replace(/<\/body>/i, `${bridge}</body>`);
   }

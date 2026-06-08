@@ -27,6 +27,9 @@ test('keeps the page list full width and moves watch directories into settings',
   assert.match(settingsDrawer, /id="remoteSyncUrlInput"/);
   assert.match(settingsDrawer, /id="remoteSyncTokenInput"/);
   assert.match(html, /id="loginBackdrop"/);
+  assert.match(html, /TokDoc 本地文档管理器/);
+  assert.match(html, /TokDoc 登录/);
+  assert.doesNotMatch(html, /tokhtml 登录/);
   assert.match(html, /data-filter="trash"/);
   assert.match(html, /回收站/);
 });

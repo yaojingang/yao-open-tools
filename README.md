@@ -27,7 +27,7 @@ Yao 的开源小工具集合，面向本地优先的 AI 编码、开发者效率
 | [TokKit](tools/tokkit/README.md) | Python CLI | `tok` / `tokkit` | AI 编码工具使用量台账，统计 token、成本、模型、终端、客户端和来源覆盖率。 |
 | [tokscr](tools/tokscr/README.md) | Chrome MV3 扩展 | 浏览器插件 | 网页截图工具，支持完整页面、可见区域、选择区域、主体去噪、预览页二次裁剪和 PNG/JPEG/PDF/复制/打印导出。 |
 | [toktra](tools/toktra/README.md) | Chrome MV3 扩展 | 浏览器插件 | 网页和 PDF 英译中阅读插件，支持手动/站点/全局翻译模式、划词翻译、缓存、PDF 双栏阅读和本地 API 配置。 |
-| [TokHtml](tools/TokHtml/README.md) | Node.js / Docker 本地工作台 | `npm run dev` / Docker | 本地 HTML 管理器，支持上传 HTML、目录监听、生成公开页面、页面内编辑、回收站、访问统计和线上同步。 |
+| [TokDoc](tools/TokDoc/README.md) | Node.js / Docker 本地工作台 | `npm run dev` / Docker | 本地文档管理器，支持上传 HTML/PDF/Word、目录监听、生成公开短链接、HTML 页面内编辑、回收站、访问统计和线上同步。 |
 | [vidbrief](tools/vidbrief/README.md) | Python CLI/TUI | `vb` | 视频下载、字幕或音频转写、Transcript 整理和 AI 报告生成。 |
 | [mem](tools/mem/README.md) | Python CLI/TUI | `mem` | 本机内存、GPU、软件活跃度和进程明细诊断。 |
 | [Scai](tools/yao-scai-cli/README.md) | Python CLI/TUI | `scai` | AI-native 磁盘空间扫描与清理建议工具，用于找大文件、分析风险和生成释放空间方案。 |
@@ -106,17 +106,17 @@ tok html month
 4. 选择 tools/toktra/extension/
 ```
 
-### TokHtml
+### TokDoc
 
-TokHtml 是一个本地 HTML 管理器，用于把零散 HTML 文件、带附件的 HTML 目录和本地监听目录统一收录成可管理、可预览、可编辑的页面库。
+TokDoc 是一个本地文档管理器，用于把零散 HTML 文件、带附件的 HTML 目录、PDF、Word 和本地监听目录统一收录成可管理、可预览、可阅读的文档库。
 
-它可以在本机 Node.js 或 Docker 容器里运行。后台管理入口固定为 `/admin`，生成后的 `/pages/<slug>.html` 页面可公开访问；进入 `?edit=1` 的在线编辑模式和管理 API 仍需要登录。
+它可以在本机 Node.js 或 Docker 容器里运行。后台管理入口固定为 `/admin`，生成后的 `/<slug>` 页面可公开访问；进入 `?edit=1` 的 HTML 在线编辑模式和管理 API 仍需要登录。旧格式 `/pages/<slug>.html` 继续兼容访问。
 
 主要能力包括：
 
-- 上传单个 HTML、批量 HTML 或完整文件夹，并保留图片、CSS、JS 等相对路径附件。
-- 监听多个本地目录，自动识别 HTML 新增和更新。
-- 自动生成短 URL，例如 `/pages/f812c6.html`。
+- 上传单个 HTML/PDF/Word、批量文件或完整 HTML 文件夹，并保留图片、CSS、JS 等相对路径附件。
+- 监听多个本地目录，自动识别 HTML/PDF/Word 新增和更新。
+- 自动生成短 URL，例如 `/f812c6`。
 - 页面内直接修改文字并自动保存，保留版本快照。
 - 回收站、恢复、访问次数统计、分页列表和统计代码注入。
 - 可绑定同类线上程序，一键同步当前 HTML。
@@ -124,7 +124,7 @@ TokHtml 是一个本地 HTML 管理器，用于把零散 HTML 文件、带附件
 快速开始：
 
 ```bash
-cd yao-open-tools/tools/TokHtml
+cd yao-open-tools/tools/TokDoc
 npm install
 npm run dev
 ```
@@ -132,7 +132,7 @@ npm run dev
 Docker 启动：
 
 ```bash
-cd yao-open-tools/tools/TokHtml
+cd yao-open-tools/tools/TokDoc
 docker compose up --build
 ```
 
@@ -236,7 +236,7 @@ yao-open-tools/
     tokkit/
     tokscr/
     toktra/
-    TokHtml/
+    TokDoc/
     vidbrief/
     mem/
     yao-scai-cli/
@@ -264,7 +264,7 @@ cd yao-open-tools
 ls tools
 ```
 
-如果你只想看 AI 编码使用量，从 `tools/tokkit` 开始。如果你想截图网页，从 `tools/tokscr` 开始。如果你想翻译英文网页或 PDF，从 `tools/toktra` 开始。如果你想管理和在线编辑本地 HTML 页面，从 `tools/TokHtml` 开始。如果你想处理视频 transcript，从 `tools/vidbrief` 开始。如果你想诊断本机内存，从 `tools/mem` 开始。如果你想找磁盘空间占用，从 `tools/yao-scai-cli` 开始。
+如果你只想看 AI 编码使用量，从 `tools/tokkit` 开始。如果你想截图网页，从 `tools/tokscr` 开始。如果你想翻译英文网页或 PDF，从 `tools/toktra` 开始。如果你想管理 HTML/PDF/Word 文档并在线编辑 HTML 页面，从 `tools/TokDoc` 开始。如果你想处理视频 transcript，从 `tools/vidbrief` 开始。如果你想诊断本机内存，从 `tools/mem` 开始。如果你想找磁盘空间占用，从 `tools/yao-scai-cli` 开始。
 
 ## 后续方向
 

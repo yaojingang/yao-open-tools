@@ -99,16 +99,16 @@ export function parseHtmlMetadata(html, fileName = 'page.html') {
   return { title, body };
 }
 
-export function stripTokhtmlAssetBase(html) {
-  return String(html || '').replace(/\s*<base\b[^>]*\bdata-tokhtml-base\b[^>]*>\s*/gi, '\n');
+export function stripTokdocAssetBase(html) {
+  return String(html || '').replace(/\s*<base\b[^>]*\bdata-tok(?:doc|html)-base\b[^>]*>\s*/gi, '\n');
 }
 
 export function injectAssetBase(html, assetBaseUrl = '') {
-  const cleanHtml = stripTokhtmlAssetBase(html);
+  const cleanHtml = stripTokdocAssetBase(html);
   const normalized = String(assetBaseUrl || '').trim();
   if (!normalized) return cleanHtml;
   const href = normalized.endsWith('/') ? normalized : `${normalized}/`;
-  const baseTag = `<base data-tokhtml-base href="${escapeHtml(href)}">`;
+  const baseTag = `<base data-tokdoc-base href="${escapeHtml(href)}">`;
   if (/<head\b[^>]*>/i.test(cleanHtml)) {
     return cleanHtml.replace(/<head\b[^>]*>/i, (match) => `${match}\n${baseTag}`);
   }
@@ -119,14 +119,14 @@ export function injectAssetBase(html, assetBaseUrl = '') {
 }
 
 export function stripTrackingCode(html) {
-  return String(html || '').replace(/\s*<!-- tokhtml-tracking:start -->[\s\S]*?<!-- tokhtml-tracking:end -->\s*/gi, '\n');
+  return String(html || '').replace(/\s*<!-- tok(?:doc|html)-tracking:start -->[\s\S]*?<!-- tok(?:doc|html)-tracking:end -->\s*/gi, '\n');
 }
 
 export function injectTrackingCode(html, trackingCode = '') {
   const cleanHtml = stripTrackingCode(html);
   const code = String(trackingCode || '').trim();
   if (!code) return cleanHtml;
-  const block = `\n<!-- tokhtml-tracking:start -->\n${code}\n<!-- tokhtml-tracking:end -->\n`;
+  const block = `\n<!-- tokdoc-tracking:start -->\n${code}\n<!-- tokdoc-tracking:end -->\n`;
   if (/<\/head>/i.test(cleanHtml)) return cleanHtml.replace(/<\/head>/i, `${block}</head>`);
   if (/<\/body>/i.test(cleanHtml)) return cleanHtml.replace(/<\/body>/i, `${block}</body>`);
   return `${cleanHtml}${block}`;
@@ -174,13 +174,23 @@ function normalizeFreePositionedStyle(node) {
 
 export function removeEditBridge(html) {
   const { document } = parseHTML(String(html || ''));
-  document.querySelectorAll('[data-tokhtml-bridge]').forEach((node) => node.remove());
-  document.querySelectorAll('.tokhtml-adjustable-active').forEach((node) => node.classList.remove('tokhtml-adjustable-active'));
-  document.querySelectorAll('[data-tokhtml-module]').forEach((node) => {
+  document.querySelectorAll('[data-tokdoc-bridge],[data-tokhtml-bridge]').forEach((node) => node.remove());
+  document.querySelectorAll('.tokdoc-adjustable-active,.tokhtml-adjustable-active').forEach((node) => {
+    node.classList.remove('tokdoc-adjustable-active', 'tokhtml-adjustable-active');
+  });
+  document.querySelectorAll('[data-tokdoc-module],[data-tokhtml-module]').forEach((node) => {
     normalizeFreePositionedStyle(node);
+    node.removeAttribute('data-tokdoc-module');
+    node.removeAttribute('data-tokdoc-free-positioned');
     node.removeAttribute('data-tokhtml-module');
     node.removeAttribute('data-tokhtml-free-positioned');
     node.removeAttribute('draggable');
+    node.classList.remove('tokdoc-draggable-module');
+    node.classList.remove('tokdoc-module--dragging');
+    node.classList.remove('tokdoc-module--drop-target');
+    node.classList.remove('tokdoc-module--free-positioned');
+    node.classList.remove('tokdoc-module--free-dragging');
+    node.classList.remove('tokdoc-module--resizing');
     node.classList.remove('tokhtml-draggable-module');
     node.classList.remove('tokhtml-module--dragging');
     node.classList.remove('tokhtml-module--drop-target');
@@ -188,9 +198,11 @@ export function removeEditBridge(html) {
     node.classList.remove('tokhtml-module--free-dragging');
     node.classList.remove('tokhtml-module--resizing');
   });
-  document.querySelectorAll('[data-tokhtml-editable]').forEach((node) => {
+  document.querySelectorAll('[data-tokdoc-editable],[data-tokhtml-editable]').forEach((node) => {
     node.removeAttribute('contenteditable');
+    node.removeAttribute('data-tokdoc-editable');
     node.removeAttribute('data-tokhtml-editable');
+    node.classList.remove('tokdoc-editable');
     node.classList.remove('tokhtml-editable');
   });
   return `<!doctype html>\n${document.documentElement.outerHTML}`;

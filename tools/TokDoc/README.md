@@ -1,6 +1,6 @@
-# tokhtml
+# TokDoc
 
-tokhtml 是一个本地文档管理器，用 Docker 或本机 Node 启动后，可以上传 HTML、PDF 和 Word，生成本地短 URL。HTML 可以预览并在页面内像文档一样直接编辑和自动保存；PDF 和 Word 会以阅读器方式打开，其中 Word 会先转换成 PDF 阅读版本。
+TokDoc 是一个本地文档管理器，用 Docker 或本机 Node 启动后，可以上传 HTML、PDF 和 Word，生成本地短 URL。HTML 可以预览并在页面内像文档一样直接编辑和自动保存；PDF 和 Word 会以阅读器方式打开，其中 Word 会先转换成 PDF 阅读版本。
 
 ## 本地启动
 
@@ -30,7 +30,7 @@ http://127.0.0.1:18082/admin
 如果要改宿主机端口：
 
 ```bash
-TOKHTML_HOST_PORT=8088 docker compose up --build
+TOKDOC_HOST_PORT=8088 docker compose up --build
 ```
 
 默认挂载：
@@ -38,7 +38,7 @@ TOKHTML_HOST_PORT=8088 docker compose up --build
 - `./data:/app/data`：SQLite、上传文件、生成页面和版本快照。
 - `./html-inbox:/watch/html-inbox`：容器内默认监听目录。
 
-Docker 镜像内置 LibreOffice Writer 和 Noto CJK 字体，用于把 `.doc/.docx` 转成 PDF。若本机 Node 直接启动并需要 Word 转 PDF，需要额外安装 LibreOffice，或通过 `TOKHTML_SOFFICE_BIN` 指定 `soffice` 路径。
+Docker 镜像内置 LibreOffice Writer 和 Noto CJK 字体，用于把 `.doc/.docx` 转成 PDF。若本机 Node 直接启动并需要 Word 转 PDF，需要额外安装 LibreOffice，或通过 `TOKDOC_SOFFICE_BIN` 指定 `soffice` 路径。旧部署中的 `TOKHTML_*` 环境变量仍会被读取作为兼容 fallback。
 
 ## 登录
 
@@ -46,8 +46,10 @@ Docker 镜像内置 LibreOffice Writer 和 Noto CJK 字体，用于把 `.doc/.do
 
 ```text
 用户名：admin
-密码：tokhtml
+密码：tokdoc
 ```
+
+新安装默认密码是 `tokdoc`。如果旧数据库已经保存过账号密码，系统会继续使用数据库里的旧设置，不会覆盖已有登录信息。
 
 登录成功后会写入长期会话 Cookie，默认保持登录状态。可以在“设置”里修改登录用户名和密码；密码留空保存时不会覆盖当前密码。
 
@@ -58,7 +60,7 @@ Docker 镜像内置 LibreOffice Writer 和 Noto CJK 字体，用于把 `.doc/.do
 1. 点击“选择文件”上传单个或多个 `.html/.htm/.pdf/.doc/.docx` 文件。
 2. 点击“导入目录”可以通过浏览器批量导入一个目录下的 HTML 文件和附件，同时也会识别目录中的 PDF、Word。HTML 目录上传会同步 CSS、JS、图片等相对路径附件，并自动写入 `/page-assets/<uploadId>/...` 资源根。
 3. 在“设置”里填入容器可访问的目录路径，例如 `/watch/html-inbox`，保存后会持久化监听目录并扫描。
-4. 在“设置”的“统计代码注入”里填写统计脚本，新上传或新扫描生成的 HTML 会自动注入该代码。
+4. 在“设置”的“统计代码注入”里填写统计脚本，新上传或新扫描生成的 HTML 会自动注入该代码，并使用 TokDoc 标记包裹。
 5. 文档列表里点击“预览”可在管理器内查看 HTML 或阅读 PDF；生成后的 `/<slug>` 可公开访问。
 6. HTML 点击“编辑”会打开 `/<slug>?edit=1`，直接在页面中修改标题、段落、列表、表格等文字，编辑入口需要后台登录态。PDF 和 Word 作为阅读资产，不进入在线编辑桥。
 7. 编辑模式会在鼠标所在的最小可调整模块内部显示一个 `↔` 悬浮手柄和四条边缘拉伸区。拖动 `↔` 可移动模块并写入 `left/top`；拖动上下左右边缘可调整 `width/height`。双击 `↔` 可清除自由定位并回到文档流。
@@ -116,7 +118,7 @@ data/pages/20260608-contract-a1b2c3.pdf
 ## 数据目录
 
 ```text
-data/tokhtml.db       SQLite 数据库
+data/tokdoc.db        SQLite 数据库；旧安装若已有 data/tokhtml.db 会继续读取旧库
 data/uploads/         上传源文件副本，含 HTML/PDF/Word 原文件和目录附件
 data/pages/           生成后的本地页面或阅读文件，文件名包含日期、原始名称和短码
 data/trash/           回收站文件，未注册为可访问静态目录
@@ -136,5 +138,5 @@ npm test
 早期单文件 UI 原型保留在：
 
 ```text
-docs/prototype/tokhtml-prototype.html
+docs/prototype/tokdoc-prototype.html
 ```

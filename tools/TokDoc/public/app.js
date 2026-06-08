@@ -177,7 +177,8 @@ function visiblePageNumbers() {
 function renderWatchDirectories() {
   els.watchList.innerHTML = watchDirectories
     .map((item) => {
-      const statusText = item.status === 'updated' ? '已更新' : item.status === 'active' ? '自动监听' : item.status;
+      const statusText = item.status === 'updated' ? '已更新' : item.status === 'active' ? '自动监听' : item.status === 'error' ? '无法访问' : item.status;
+      const statusClass = item.status === 'error' ? 'badge-warning' : 'badge-success';
       return `<div class="watch-item" data-watch-id="${escapeHtml(item.id)}">
         <div class="watch-item-main">
           ${icons.folder}
@@ -189,7 +190,7 @@ function renderWatchDirectories() {
               <span>${escapeHtml(item.lastScan || '等待扫描')}</span>
             </div>
           </div>
-          <span class="badge badge-success">${escapeHtml(statusText)}</span>
+          <span class="badge ${statusClass}">${escapeHtml(statusText)}</span>
         </div>
         <div class="watch-actions">
           <button class="btn" type="button" data-watch-action="rescan" data-id="${escapeHtml(item.id)}">重新扫描</button>

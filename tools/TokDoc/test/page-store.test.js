@@ -7,10 +7,10 @@ import { createDb } from '../src/db.js';
 import { PageStore } from '../src/page-store.js';
 
 async function createStore(overrides = {}) {
-  const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tokhtml-test-'));
+  const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tokdoc-test-'));
   const watchDir = path.join(dataDir, 'watch');
   const config = {
-    name: 'tokhtml',
+    name: 'tokdoc',
     rootDir: dataDir,
     host: '127.0.0.1',
     port: 0,
@@ -56,7 +56,7 @@ test('imports uploaded PDF as a public readable document asset', async (t) => {
   t.after(() => db.close());
   t.after(() => fs.rm(dataDir, { recursive: true, force: true }));
 
-  const pdfBytes = Buffer.from('%PDF-1.4\n% tokhtml pdf probe\n');
+  const pdfBytes = Buffer.from('%PDF-1.4\n% tokdoc pdf probe\n');
   const page = await store.importBuffer({
     fileName: 'report.pdf',
     relativePath: 'docs/report.pdf',
@@ -76,7 +76,7 @@ test('imports uploaded PDF as a public readable document asset', async (t) => {
 });
 
 test('imports uploaded Word documents by converting them to readable PDF assets', async (t) => {
-  const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tokhtml-office-'));
+  const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tokdoc-office-'));
   const fakeOffice = path.join(dataDir, 'fake-soffice.mjs');
   await fs.writeFile(
     fakeOffice,
@@ -143,7 +143,7 @@ test('imports upload folders with sibling assets and injects a page asset base',
   assert.equal(pages[0].directoryName, 'campaign');
   assert.equal(pages[0].fileName, 'index.html');
   assert.match(path.basename(pages[0].generatedPath), new RegExp(`^\\d{8}-index-${pages[0].slug}\\.html$`));
-  assert.match(await store.readPageHtml(pages[0]), /<base data-tokhtml-base href="\/page-assets\/[^/]+\/campaign\/">/);
+  assert.match(await store.readPageHtml(pages[0]), /<base data-tokdoc-base href="\/page-assets\/[^/]+\/campaign\/">/);
   await fs.access(path.join(path.dirname(pages[0].sourcePath), 'css', 'style.css'));
   await fs.access(path.join(path.dirname(pages[0].sourcePath), 'images', 'logo.png'));
 });
@@ -160,11 +160,15 @@ test('injects configured tracking code into newly generated HTML pages', async (
   const page = await store.importBuffer({
     fileName: 'tracked.html',
     relativePath: 'tracked.html',
-    buffer: Buffer.from('<!doctype html><html><head><title>统计页</title></head><body><h1>统计页</h1></body></html>'),
+    buffer: Buffer.from(
+      '<!doctype html><html><head><title>统计页</title><!-- tokhtml-tracking:start --><script>window.oldTracker=true</script><!-- tokhtml-tracking:end --></head><body><h1>统计页</h1></body></html>',
+    ),
   });
   const html = await store.readPageHtml(page);
 
-  assert.match(html, /<!-- tokhtml-tracking:start -->/);
+  assert.match(html, /<!-- tokdoc-tracking:start -->/);
+  assert.doesNotMatch(html, /tokhtml-tracking/);
+  assert.doesNotMatch(html, /oldTracker/);
   assert.match(html, /<script data-test-tracker>window\.__tracked = true;<\/script>/);
   assert.ok(html.indexOf('data-test-tracker') < html.indexOf('</head>'));
   assert.equal((html.match(/data-test-tracker/g) || []).length, 1);
@@ -224,6 +228,21 @@ test('rescans watch directory and upserts HTML files', async (t) => {
   assert.equal(pages.length, 1);
   assert.equal(pages[0].directoryName, 'school');
   assert.equal(pages[0].sourceType, 'watch');
+});
+
+test('marks inaccessible watch directories as errored instead of throwing', async (t) => {
+  const { store, db, dataDir } = await createStore();
+  t.after(() => db.close());
+  t.after(() => fs.rm(dataDir, { recursive: true, force: true }));
+
+  const blocker = path.join(dataDir, 'not-a-directory');
+  await fs.writeFile(blocker, 'file');
+  const watch = await store.addWatchDir({ path: path.join(blocker, 'watch'), name: 'broken-watch', createIfMissing: false });
+  const rescanned = await store.rescanWatchDir(watch.id);
+
+  assert.equal(rescanned.status, 'error');
+  assert.equal(rescanned.htmlCount, 0);
+  assert.equal(store.listPages().length, 0);
 });
 
 test('paginates page list with a default page size of 20', async (t) => {

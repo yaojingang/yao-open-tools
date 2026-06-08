@@ -1,0 +1,17 @@
+services:
+  tokdoc:
+    build: .
+    container_name: tokdoc
+    ports:
+      - "${TOKDOC_HOST_PORT:-18082}:8080"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8080
+      TOKDOC_DATA_DIR: /app/data
+      TOKDOC_WATCH_DIRS: /watch/html-inbox
+      TOKDOC_ALLOW_SOURCE_WRITE: "false"
+      TOKDOC_SOFFICE_BIN: soffice
+    volumes:
+      - ./data:/app/data
+      - ./html-inbox:/watch/html-inbox
+    restart: unless-stopped

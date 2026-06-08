@@ -51,12 +51,12 @@ test('injectEditBridge uses a structured kami-style floating toolbar', () => {
     '<!doctype html><html><head><title>页面</title></head><body><h1>页面</h1></body></html>',
   );
 
-  assert.match(html, /tokhtml-edit-panel/);
-  assert.match(html, /tokhtml-edit-panel__brand/);
-  assert.match(html, /tokhtml-edit-panel__status/);
-  assert.match(html, /tokhtml-edit-panel__actions/);
-  assert.match(html, /tokhtml-module-handle/);
-  assert.match(html, /data-tokhtml-free-handle/);
+  assert.match(html, /tokdoc-edit-panel/);
+  assert.match(html, /tokdoc-edit-panel__brand/);
+  assert.match(html, /tokdoc-edit-panel__status/);
+  assert.match(html, /tokdoc-edit-panel__actions/);
+  assert.match(html, /tokdoc-module-handle/);
+  assert.match(html, /data-tokdoc-free-handle/);
   assert.match(html, /mountModuleHandle/);
   assert.match(html, /smallestModuleAt/);
   assert.match(html, /positionModuleControls/);
@@ -66,12 +66,12 @@ test('injectEditBridge uses a structured kami-style floating toolbar', () => {
   assert.match(html, /inside-left/);
   assert.match(html, /startFreeDrag/);
   assert.match(html, /startResizeDrag/);
-  assert.match(html, /data-tokhtml-resize-handle/);
-  assert.match(html, /tokhtml-resize-handle--right/);
-  assert.match(html, /tokhtml-module--free-positioned/);
-  assert.match(html, /tokhtml-module--resizing/);
-  assert.doesNotMatch(html, /tokhtml-module-sort-handle/);
-  assert.doesNotMatch(html, /data-tokhtml-drag-handle/);
+  assert.match(html, /data-tokdoc-resize-handle/);
+  assert.match(html, /tokdoc-resize-handle--right/);
+  assert.match(html, /tokdoc-module--free-positioned/);
+  assert.match(html, /tokdoc-module--resizing/);
+  assert.doesNotMatch(html, /tokdoc-module-sort-handle/);
+  assert.doesNotMatch(html, /data-tokdoc-drag-handle/);
   assert.doesNotMatch(html, /event\.altKey/);
   assert.doesNotMatch(html, /Alt\/Option/);
   assert.match(html, /href="\/f812c6"/);
@@ -96,6 +96,16 @@ test('removeEditBridge strips drag sorting runtime markers before saving', () =>
           <span data-tokhtml-bridge="resize-handle" data-tokhtml-resize-handle="right"></span>
           <h1 data-tokhtml-editable="true" contenteditable="true" class="tokhtml-editable">标题</h1>
         </section>
+        <article
+          data-tokdoc-module="true"
+          data-tokdoc-free-positioned="true"
+          draggable="true"
+          class="note tokdoc-draggable-module tokdoc-adjustable-active tokdoc-module--free-positioned tokdoc-module--free-dragging tokdoc-module--resizing"
+        >
+          <button data-tokdoc-bridge="drag-handle" data-tokdoc-free-handle="true">↔</button>
+          <span data-tokdoc-bridge="resize-handle" data-tokdoc-resize-handle="right"></span>
+          <p data-tokdoc-editable="true" contenteditable="true" class="tokdoc-editable">说明</p>
+        </article>
       </body>
     </html>
   `);
@@ -105,6 +115,11 @@ test('removeEditBridge strips drag sorting runtime markers before saving', () =>
   assert.doesNotMatch(cleaned, /data-tokhtml-bridge/);
   assert.doesNotMatch(cleaned, /data-tokhtml-free-handle/);
   assert.doesNotMatch(cleaned, /data-tokhtml-resize-handle/);
+  assert.doesNotMatch(cleaned, /data-tokdoc-module/);
+  assert.doesNotMatch(cleaned, /data-tokdoc-free-positioned/);
+  assert.doesNotMatch(cleaned, /data-tokdoc-bridge/);
+  assert.doesNotMatch(cleaned, /data-tokdoc-free-handle/);
+  assert.doesNotMatch(cleaned, /data-tokdoc-resize-handle/);
   assert.doesNotMatch(cleaned, /contenteditable/);
   assert.doesNotMatch(cleaned, /tokhtml-editable/);
   assert.doesNotMatch(cleaned, /tokhtml-draggable-module/);
@@ -112,11 +127,19 @@ test('removeEditBridge strips drag sorting runtime markers before saving', () =>
   assert.doesNotMatch(cleaned, /tokhtml-module--free-positioned/);
   assert.doesNotMatch(cleaned, /tokhtml-module--free-dragging/);
   assert.doesNotMatch(cleaned, /tokhtml-module--resizing/);
+  assert.doesNotMatch(cleaned, /tokdoc-editable/);
+  assert.doesNotMatch(cleaned, /tokdoc-draggable-module/);
+  assert.doesNotMatch(cleaned, /tokdoc-adjustable-active/);
+  assert.doesNotMatch(cleaned, /tokdoc-module--free-positioned/);
+  assert.doesNotMatch(cleaned, /tokdoc-module--free-dragging/);
+  assert.doesNotMatch(cleaned, /tokdoc-module--resizing/);
   assert.match(cleaned, /class="hero"/);
+  assert.match(cleaned, /class="note"/);
   assert.match(cleaned, /position:absolute/);
   assert.match(cleaned, /left:24px/);
   assert.match(cleaned, /top:32px/);
   assert.match(cleaned, /height:180px/);
   assert.doesNotMatch(cleaned, /inset:/);
   assert.match(cleaned, /标题/);
+  assert.match(cleaned, /说明/);
 });

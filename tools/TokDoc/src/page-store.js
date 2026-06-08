@@ -139,7 +139,7 @@ function safeDestination(root, relativePath) {
 }
 
 const defaultAuthUsername = 'admin';
-const defaultAuthPassword = 'tokhtml';
+const defaultAuthPassword = 'tokdoc';
 
 function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString('base64url');
@@ -434,7 +434,7 @@ export class PageStore {
   }
 
   async convertWordToPdf(sourcePath, generatedPath) {
-    const converter = this.config.officeConverterBin || process.env.TOKHTML_SOFFICE_BIN || 'soffice';
+    const converter = this.config.officeConverterBin || process.env.TOKDOC_SOFFICE_BIN || process.env.TOKHTML_SOFFICE_BIN || 'soffice';
     const tempDir = await fs.mkdtemp(path.join(this.config.dataDir, 'convert-'));
     const expectedOutput = path.join(tempDir, `${basenameWithoutExtension(sourcePath)}.pdf`);
     try {
@@ -663,12 +663,20 @@ export class PageStore {
   async rescanWatchDir(id) {
     const watchDir = this.getWatchDir(id);
     if (!watchDir) throw new Error('Watch directory not found');
-    await fs.mkdir(watchDir.path, { recursive: true });
-    const files = await this.findHtmlFiles(watchDir.path);
-    for (const filePath of files) {
-      await this.upsertWatchedFile(filePath);
-    }
     const now = nowIso();
+    let files = [];
+    try {
+      await fs.mkdir(watchDir.path, { recursive: true });
+      files = await this.findHtmlFiles(watchDir.path);
+      for (const filePath of files) {
+        await this.upsertWatchedFile(filePath);
+      }
+    } catch {
+      this.db
+        .prepare('UPDATE watch_dirs SET html_count = ?, last_scan_at = ?, status = ?, updated_at = ? WHERE id = ?')
+        .run(0, now, 'error', now, id);
+      return this.getWatchDir(id);
+    }
     this.db
       .prepare('UPDATE watch_dirs SET html_count = ?, last_scan_at = ?, status = ?, updated_at = ? WHERE id = ?')
       .run(files.length, now, 'updated', now, id);

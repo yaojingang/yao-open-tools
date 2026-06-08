@@ -15,7 +15,8 @@ function publicPage(page) {
   };
 }
 
-const sessionCookieName = 'tokhtml_session';
+const sessionCookieName = 'tokdoc_session';
+const legacySessionCookieName = 'tokhtml_session';
 const sessionMaxAgeSeconds = 60 * 60 * 24 * 365 * 10;
 
 async function syncPageToRemote(app, page) {
@@ -46,7 +47,7 @@ async function syncPageToRemote(app, page) {
   const html = await app.store.readPageHtml(page);
   const headers = {
     'content-type': 'application/json',
-    'user-agent': 'tokhtml-sync',
+    'user-agent': 'tokdoc-sync',
   };
   if (settings.remoteSyncToken) headers.authorization = `Bearer ${settings.remoteSyncToken}`;
   const controller = new AbortController();
@@ -57,7 +58,8 @@ async function syncPageToRemote(app, page) {
       headers,
       signal: controller.signal,
       body: JSON.stringify({
-        source: 'tokhtml',
+        source: 'tokdoc',
+        legacySource: 'tokhtml',
         syncedAt: new Date().toISOString(),
         page: {
           id: page.id,
@@ -112,12 +114,12 @@ function sessionCookie(token) {
   return `${sessionCookieName}=${encodeURIComponent(token)}; Path=/; Max-Age=${sessionMaxAgeSeconds}; HttpOnly; SameSite=Lax`;
 }
 
-function expiredSessionCookie() {
-  return `${sessionCookieName}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`;
+function expiredSessionCookie(name = sessionCookieName) {
+  return `${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`;
 }
 
 function isPublicRequest(request) {
-  const url = new URL(request.url, 'http://tokhtml.local');
+  const url = new URL(request.url, 'http://tokdoc.local');
   const pathname = url.pathname;
   const isPublicPageView = pathname.startsWith('/pages/') && url.searchParams.get('edit') !== '1';
   const isPublicShortPageView = /^\/[a-z0-9]{6}$/.test(pathname) && url.searchParams.get('edit') !== '1';
@@ -159,7 +161,7 @@ async function sendGeneratedPage(app, request, reply, rawSlug) {
 
 function currentSession(app, request) {
   const cookies = parseCookies(request.headers.cookie);
-  return app.store.verifySessionToken(cookies[sessionCookieName]);
+  return app.store.verifySessionToken(cookies[sessionCookieName] || cookies[legacySessionCookieName]);
 }
 
 export function registerRoutes(app) {
@@ -182,7 +184,7 @@ export function registerRoutes(app) {
 
   app.get('/api/health', async () => ({
     ok: true,
-    name: 'tokhtml',
+    name: 'tokdoc',
     time: new Date().toISOString(),
   }));
 
@@ -204,7 +206,9 @@ export function registerRoutes(app) {
   });
 
   app.post('/api/logout', async (request, reply) => {
-    return reply.header('set-cookie', expiredSessionCookie()).send({ authenticated: false });
+    return reply
+      .header('set-cookie', [expiredSessionCookie(), expiredSessionCookie(legacySessionCookieName)])
+      .send({ authenticated: false });
   });
 
   app.get('/api/pages', async (request) => {

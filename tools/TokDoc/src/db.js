@@ -3,8 +3,8 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 export function createDb(config) {
-  fs.mkdirSync(config.dataDir, { recursive: true });
-  const dbPath = path.join(config.dataDir, 'tokhtml.db');
+  const dbPath = config.dbPath || path.join(config.dataDir, 'tokdoc.db');
+  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   const db = new DatabaseSync(dbPath);
   db.exec('PRAGMA journal_mode = WAL;');
   db.exec('PRAGMA foreign_keys = ON;');

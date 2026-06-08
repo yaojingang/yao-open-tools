@@ -59,5 +59,5 @@ if (path.resolve(process.argv[1] || '') === fileURLToPath(import.meta.url)) {
   const config = loadConfig();
   const app = await buildApp(config);
   await app.listen({ port: config.port, host: config.host });
-  app.log.info(`tokhtml listening at http://${config.host}:${config.port}`);
+  app.log.info(`tokdoc listening at http://${config.host}:${config.port}`);
 }

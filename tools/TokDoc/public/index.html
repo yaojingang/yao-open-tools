@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>tokhtml 本地文档管理器</title>
+    <title>TokDoc 本地文档管理器</title>
     <style>
       :root {
         --bg: #f5f4ed;
@@ -1659,7 +1659,7 @@
               </svg>
             </div>
             <div>
-              <span class="brand-title">tokhtml</span>
+              <span class="brand-title">TokDoc</span>
               <span class="brand-subtitle">本地文档管理器 · Docker 运行 · 即开即读</span>
             </div>
           </div>
@@ -1817,8 +1817,8 @@
             </svg>
           </div>
           <div>
-            <span class="brand-title" id="loginTitle">tokhtml 登录</span>
-            <span class="brand-subtitle">默认账号 admin，默认密码 tokhtml</span>
+            <span class="brand-title" id="loginTitle">TokDoc 登录</span>
+            <span class="brand-subtitle">默认账号 admin，默认密码 tokdoc</span>
           </div>
         </div>
         <form class="login-form" id="loginForm">
@@ -1862,7 +1862,7 @@
           <div class="field">
             <label for="trackingCodeInput">统计代码注入</label>
             <textarea id="trackingCodeInput" spellcheck="false" placeholder="<script>...</script>"></textarea>
-            <p class="field-hint">保存后，新上传或新扫描生成的 HTML 会自动注入这段代码；系统会用 tokhtml 标记包裹，避免重复注入。</p>
+            <p class="field-hint">保存后，新上传或新扫描生成的 HTML 会自动注入这段代码；系统会用 TokDoc 标记包裹，避免重复注入。</p>
           </div>
           <section class="settings-section" aria-label="线上绑定">
             <div>
@@ -1876,7 +1876,7 @@
             <div class="field">
               <label for="remoteSyncUrlInput">线上程序 API 地址</label>
               <input id="remoteSyncUrlInput" inputmode="url" placeholder="https://example.com/api/import" />
-              <p class="field-hint">线上程序需接收 JSON：页面元信息、HTML 内容和 tokhtml 来源标记。</p>
+              <p class="field-hint">线上程序需接收 JSON：页面元信息、HTML 内容和 TokDoc 来源标记。</p>
             </div>
             <div class="field">
               <label for="remoteSyncTokenInput">访问 Token</label>
@@ -1933,7 +1933,7 @@
             </div>
             <ul class="plan-list">
               <li><span class="check-mark">✓</span><span>前端负责上传、列表、预览、编辑体验；后端负责文件读写和 URL 映射。</span></li>
-              <li><span class="check-mark">✓</span><span>预览页内注入 tokhtml 编辑桥，直接改字并防抖自动保存。</span></li>
+              <li><span class="check-mark">✓</span><span>预览页内注入 TokDoc 编辑桥，直接改字并防抖自动保存。</span></li>
               <li><span class="check-mark">✓</span><span>Docker 可挂载多个目录，后端持续监听新增和更新，并写入 SQLite 元数据。</span></li>
             </ul>
           </section>
