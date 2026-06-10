@@ -151,6 +151,24 @@ function cleanUploadPath(value, fallback = 'file') {
   return path.basename(fallback || 'file').replace(/[\u0000-\u001f<>:"|?*]/g, '_') || 'file';
 }
 
+function editableUploadFileName(value, fallback = 'file') {
+  const fallbackName = path.posix.basename(cleanUploadPath(fallback, 'file'));
+  const fallbackExtension = path.posix.extname(fallbackName);
+  const rawName = path.posix.basename(String(value || '').replace(/\\/g, '/')).trim();
+  const cleaned = cleanUploadPath(rawName || fallbackName, fallbackName).split('/').at(-1) || fallbackName;
+  const currentExtension = path.posix.extname(cleaned);
+  const currentStem = currentExtension ? cleaned.slice(0, -currentExtension.length) : cleaned;
+  const fallbackStem = fallbackExtension ? fallbackName.slice(0, -fallbackExtension.length) : fallbackName;
+  const stem = (currentStem || fallbackStem || 'file').trim();
+  return `${stem}${fallbackExtension || currentExtension}`;
+}
+
+function replaceRelativeBasename(relativePath, fileName) {
+  const directory = path.posix.dirname(relativePath);
+  if (!directory || directory === '.') return fileName;
+  return `${directory}/${fileName}`;
+}
+
 function assetBaseUrl(uploadRootId, relativePath) {
   const directory = path.posix.dirname(relativePath);
   const segments = [uploadRootId];
@@ -170,6 +188,10 @@ function safeDestination(root, relativePath) {
 
 const defaultAuthUsername = 'admin';
 const defaultAuthPassword = 'tokdoc';
+const defaultSiteName = 'TokDoc 文档索引';
+const defaultAdminName = 'TokDoc';
+const defaultPublicSeoDescription = '公开文档索引，集中阅读 HTML、PDF 与 Word 文档。';
+const defaultPublicSeoKeywords = 'TokDoc,文档索引,HTML,PDF,Word';
 
 function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString('base64url');
@@ -201,6 +223,7 @@ export class PageStore {
   async ensureStorage() {
     await Promise.all([
       fs.mkdir(this.config.uploadsDir, { recursive: true }),
+      fs.mkdir(this.pendingUploadDir(), { recursive: true }),
       fs.mkdir(this.config.generatedDir, { recursive: true }),
       fs.mkdir(this.trashDir(), { recursive: true }),
       fs.mkdir(this.config.versionsDir, { recursive: true }),
@@ -363,12 +386,144 @@ export class PageStore {
     return page;
   }
 
+  pendingUploadDir() {
+    return path.join(this.config.dataDir, 'pending-uploads');
+  }
+
+  stagedUploadDir(uploadId) {
+    const safeUploadId = String(uploadId || '');
+    if (!/^[a-z0-9-]{20,80}$/i.test(safeUploadId)) {
+      throw new Error('Invalid upload batch');
+    }
+    return path.join(this.pendingUploadDir(), safeUploadId);
+  }
+
+  stagedUploadManifestPath(uploadId) {
+    return path.join(this.stagedUploadDir(uploadId), 'manifest.json');
+  }
+
+  async readStagedUploadManifest(uploadId) {
+    try {
+      return JSON.parse(await fs.readFile(this.stagedUploadManifestPath(uploadId), 'utf8'));
+    } catch {
+      throw new Error('Upload batch not found');
+    }
+  }
+
+  async stageUploadFiles(files = []) {
+    const normalized = files
+      .filter((file) => file?.buffer)
+      .map((file) => {
+        const relativePath = cleanUploadPath(file.relativePath || file.fileName, file.fileName || 'file');
+        return {
+          fileName: path.posix.basename(relativePath) || path.basename(file.fileName || 'file'),
+          relativePath,
+          buffer: file.buffer,
+        };
+      });
+    const managedFiles = normalized.filter((file) => isManagedFile(file.relativePath));
+    if (!managedFiles.length) {
+      return {
+        uploadId: '',
+        documents: [],
+        fileCount: normalized.length,
+        assetCount: normalized.length,
+        totalSize: normalized.reduce((sum, file) => sum + file.buffer.length, 0),
+      };
+    }
+
+    const uploadId = crypto.randomUUID();
+    const uploadRoot = this.stagedUploadDir(uploadId);
+    await fs.mkdir(uploadRoot, { recursive: true });
+
+    for (const file of normalized) {
+      const destination = safeDestination(uploadRoot, file.relativePath);
+      await fs.mkdir(path.dirname(destination), { recursive: true });
+      await fs.writeFile(destination, file.buffer);
+    }
+
+    const documents = managedFiles.map((file) => {
+      const fileType = managedFileType(file.relativePath);
+      const title = isHtmlFile(file.relativePath)
+        ? parseHtmlMetadata(file.buffer.toString('utf8'), file.fileName).title
+        : documentTitleFromFileName(file.fileName);
+      return {
+        id: crypto.randomUUID(),
+        relativePath: file.relativePath,
+        fileName: file.fileName,
+        title,
+        fileType,
+        directoryName: parentDirectoryNameFromRelative(file.relativePath),
+        size: file.buffer.length,
+      };
+    });
+
+    const manifest = {
+      uploadId,
+      createdAt: nowIso(),
+      files: normalized.map((file) => ({
+        fileName: file.fileName,
+        relativePath: file.relativePath,
+        size: file.buffer.length,
+      })),
+      documents,
+    };
+    await fs.writeFile(this.stagedUploadManifestPath(uploadId), JSON.stringify(manifest, null, 2));
+
+    return {
+      uploadId,
+      documents,
+      fileCount: normalized.length,
+      assetCount: Math.max(0, normalized.length - managedFiles.length),
+      totalSize: normalized.reduce((sum, file) => sum + file.buffer.length, 0),
+    };
+  }
+
+  async confirmStagedUpload(uploadId, options = {}) {
+    const manifest = await this.readStagedUploadManifest(uploadId);
+    const uploadRoot = this.stagedUploadDir(uploadId);
+    const editsById = new Map((options.documents || []).map((item) => [String(item.id || ''), item]));
+    const documentsByPath = new Map(manifest.documents.map((document) => [document.relativePath, document]));
+    const importFiles = [];
+
+    for (const file of manifest.files) {
+      const source = safeDestination(uploadRoot, file.relativePath);
+      const buffer = await fs.readFile(source);
+      const document = documentsByPath.get(file.relativePath);
+      if (!document) {
+        importFiles.push({ fileName: file.fileName, relativePath: file.relativePath, buffer });
+        continue;
+      }
+
+      const edit = editsById.get(document.id) || {};
+      const fileName = editableUploadFileName(edit.fileName, document.fileName);
+      const title = String(edit.title || document.title || '').trim();
+      importFiles.push({
+        id: document.id,
+        title,
+        fileName,
+        relativePath: replaceRelativeBasename(document.relativePath, fileName),
+        buffer,
+      });
+    }
+
+    const created = await this.importUploadFiles(importFiles);
+    await fs.rm(uploadRoot, { recursive: true, force: true });
+    return created;
+  }
+
+  async cancelStagedUpload(uploadId) {
+    await fs.rm(this.stagedUploadDir(uploadId), { recursive: true, force: true });
+  }
+
   async importUploadFiles(files = []) {
     const normalized = files
       .filter((file) => file?.buffer)
       .map((file) => {
         const relativePath = cleanUploadPath(file.relativePath || file.fileName, file.fileName || 'file');
         return {
+          id: file.id,
+          title: String(file.title || '').trim(),
           fileName: path.posix.basename(relativePath) || path.basename(file.fileName || 'file'),
           relativePath,
           buffer: file.buffer,
@@ -398,9 +553,10 @@ export class PageStore {
         const content = file.buffer.toString('utf8');
         created.push(
           await this.createPageFromContent({
-            id: crypto.randomUUID(),
+            id: file.id || crypto.randomUUID(),
             fileName: file.fileName,
             content,
+            title: file.title,
             sourceType: 'upload',
             sourcePath,
             directoryName: parentDirectoryNameFromRelative(file.relativePath),
@@ -412,8 +568,9 @@ export class PageStore {
       }
       created.push(
         await this.createDocumentAsset({
-          id: crypto.randomUUID(),
+          id: file.id || crypto.randomUUID(),
           fileName: file.fileName,
+          title: file.title,
           buffer: file.buffer,
           sourceType: 'upload',
           sourcePath,
@@ -463,9 +620,10 @@ export class PageStore {
     return created;
   }
 
-  async createPageFromContent({ id, fileName, content, sourceType, sourcePath, directoryName, rawMtimeMs, assetBaseUrl: pageAssetBaseUrl = '' }) {
+  async createPageFromContent({ id, fileName, content, title, sourceType, sourcePath, directoryName, rawMtimeMs, assetBaseUrl: pageAssetBaseUrl = '' }) {
     const createdAt = nowIso();
     const parsed = parseHtmlMetadata(content, fileName);
+    const pageTitle = String(title || '').trim() || parsed.title;
     const slug = this.uniqueManagedSlug();
     const generatedPath = path.join(this.config.generatedDir, generatedFileNameForPage({ slug, fileName, createdAt }));
     const generatedContent = this.prepareGeneratedHtml(content, pageAssetBaseUrl);
@@ -474,7 +632,7 @@ export class PageStore {
       id,
       slug,
       fileName,
-      title: parsed.title,
+      title: pageTitle,
       fileType: 'html',
       mimeType: generatedMimeType('html'),
       sourceType,
@@ -495,7 +653,7 @@ export class PageStore {
     return this.getPage(id);
   }
 
-  async createDocumentAsset({ id, fileName, buffer, sourceType, sourcePath, directoryName, rawMtimeMs, fileType }) {
+  async createDocumentAsset({ id, fileName, title, buffer, sourceType, sourcePath, directoryName, rawMtimeMs, fileType }) {
     const createdAt = nowIso();
     const slug = this.uniqueManagedSlug();
     const generatedPath = path.join(this.config.generatedDir, generatedFileNameForAsset({ slug, fileName, createdAt }, 'pdf'));
@@ -511,7 +669,7 @@ export class PageStore {
       id,
       slug,
       fileName,
-      title: documentTitleFromFileName(fileName),
+      title: String(title || '').trim() || documentTitleFromFileName(fileName),
       fileType,
       mimeType: generatedMimeType(fileType),
       sourceType,
@@ -593,6 +751,11 @@ export class PageStore {
       trackingCode: '',
       authUsername: auth.authUsername,
       adminPath: this.getAdminPath(),
+      siteName: defaultSiteName,
+      adminName: defaultAdminName,
+      publicSeoTitle: defaultSiteName,
+      publicSeoDescription: defaultPublicSeoDescription,
+      publicSeoKeywords: defaultPublicSeoKeywords,
       publicHomepageEnabled: true,
       remoteSyncEnabled: false,
       remoteSyncUrl: '',
@@ -600,12 +763,29 @@ export class PageStore {
     };
     for (const row of rows) {
       if (row.key === 'tracking_code') settings.trackingCode = row.value || '';
+      if (row.key === 'site_name') settings.siteName = row.value || defaultSiteName;
+      if (row.key === 'admin_name') settings.adminName = row.value || defaultAdminName;
+      if (row.key === 'public_seo_title') settings.publicSeoTitle = row.value || settings.siteName || defaultSiteName;
+      if (row.key === 'public_seo_description') settings.publicSeoDescription = row.value || defaultPublicSeoDescription;
+      if (row.key === 'public_seo_keywords') settings.publicSeoKeywords = row.value || defaultPublicSeoKeywords;
       if (row.key === 'public_homepage_enabled') settings.publicHomepageEnabled = row.value !== '0';
       if (row.key === 'remote_sync_enabled') settings.remoteSyncEnabled = row.value === '1';
       if (row.key === 'remote_sync_url') settings.remoteSyncUrl = row.value || '';
       if (row.key === 'remote_sync_token') settings.remoteSyncHasToken = Boolean(row.value);
     }
     return settings;
+  }
+
+  getPublicSettings() {
+    const settings = this.getSettings();
+    return {
+      siteName: settings.siteName,
+      adminName: settings.adminName,
+      publicSeoTitle: settings.publicSeoTitle,
+      publicSeoDescription: settings.publicSeoDescription,
+      publicSeoKeywords: settings.publicSeoKeywords,
+      publicHomepageEnabled: settings.publicHomepageEnabled,
+    };
   }
 
   getRemoteSyncSettings(includeSensitive = false) {
@@ -624,6 +804,21 @@ export class PageStore {
            ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
         )
         .run('tracking_code', String(settings.trackingCode || ''), now);
+    }
+    if (Object.prototype.hasOwnProperty.call(settings, 'siteName')) {
+      this.setSetting('site_name', String(settings.siteName || defaultSiteName).trim() || defaultSiteName, now);
+    }
+    if (Object.prototype.hasOwnProperty.call(settings, 'adminName')) {
+      this.setSetting('admin_name', String(settings.adminName || defaultAdminName).trim() || defaultAdminName, now);
+    }
+    if (Object.prototype.hasOwnProperty.call(settings, 'publicSeoTitle')) {
+      this.setSetting('public_seo_title', String(settings.publicSeoTitle || '').trim(), now);
+    }
+    if (Object.prototype.hasOwnProperty.call(settings, 'publicSeoDescription')) {
+      this.setSetting('public_seo_description', String(settings.publicSeoDescription || '').trim(), now);
+    }
+    if (Object.prototype.hasOwnProperty.call(settings, 'publicSeoKeywords')) {
+      this.setSetting('public_seo_keywords', String(settings.publicSeoKeywords || '').trim(), now);
     }
     if (Object.prototype.hasOwnProperty.call(settings, 'authUsername')) {
       const username = String(settings.authUsername || '').trim();

@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { defaultAdminPath, normalizeAdminPath } from './admin-path.js';
 import { injectEditBridge } from './edit-bridge.js';
+import { escapeHtml } from './html.js';
 
 function sendNotFound(reply, message = 'Not found') {
   return reply.code(404).send({ error: message });
@@ -14,6 +15,26 @@ function publicPage(page) {
     canSync: page.fileType === 'html',
     canEditSource: page.sourceType === 'watch',
   };
+}
+
+async function collectUploadParts(request) {
+  const files = [];
+  const relativePaths = [];
+  for await (const part of request.parts()) {
+    if (part.type === 'field' && part.fieldname === 'relativePath') {
+      relativePaths.push(String(part.value || ''));
+      continue;
+    }
+    if (part.type !== 'file') continue;
+    const buffer = await part.toBuffer();
+    const relativePath = relativePaths.shift() || part.filename || '';
+    files.push({
+      fileName: path.basename(part.filename || relativePath || 'file'),
+      buffer,
+      relativePath,
+    });
+  }
+  return files;
 }
 
 const sessionCookieName = 'tokdoc_session';
@@ -128,6 +149,10 @@ function isActiveAdminPath(pathname, adminPath) {
   return normalizedPath(pathname) === adminPath;
 }
 
+function isActiveAdminSettingsPath(pathname, adminPath) {
+  return normalizedPath(pathname) === `${adminPath}/settings`;
+}
+
 function isLegacyApiPath(pathname) {
   return pathname === '/api' || pathname.startsWith('/api/');
 }
@@ -159,7 +184,9 @@ function requestAccessState(app, request) {
   if (pathname === '/healthz' || pathname === '/favicon.ico' || pathname.startsWith('/assets/') || pathname.startsWith('/page-assets/')) return 'public';
   if (isPublicListPath(pathname)) return 'public';
   if (pathname === '/admin' || pathname === '/admin/') return usingDefaultAdminPath ? 'public' : 'not-found';
+  if (pathname === '/admin/settings' || pathname === '/admin/settings/') return usingDefaultAdminPath ? 'public' : 'not-found';
   if (isActiveAdminPath(pathname, adminPath)) return 'public';
+  if (isActiveAdminSettingsPath(pathname, adminPath)) return 'public';
   if (isLegacyApiPath(pathname)) {
     if (!usingDefaultAdminPath) return 'not-found';
     return publicApiSuffix(pathname, adminPath) ? 'public' : 'protected';
@@ -207,9 +234,33 @@ async function sendAdmin(app, reply) {
   return reply.type('text/html').send(await fs.readFile(path.join(app.config.publicDir, 'index.html'), 'utf8'));
 }
 
+function metaTag(name, content) {
+  const value = String(content || '').trim();
+  if (!value) return '';
+  return `    <meta name="${name}" content="${escapeHtml(value)}" />\n`;
+}
+
 async function sendPublicIndex(app, reply) {
   if (!app.store.getSettings().publicHomepageEnabled) return sendNotFound(reply, 'Public homepage disabled');
-  return reply.type('text/html').send(await fs.readFile(path.join(app.config.publicDir, 'index-public.html'), 'utf8'));
+  const settings = app.store.getPublicSettings();
+  const siteName = settings.siteName || 'TokDoc 文档索引';
+  const seoTitle = settings.publicSeoTitle || siteName;
+  const seoDescription = settings.publicSeoDescription || '';
+  const seoKeywords = settings.publicSeoKeywords || '';
+  let html = await fs.readFile(path.join(app.config.publicDir, 'index-public.html'), 'utf8');
+  html = html
+    .replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(seoTitle)}</title>`)
+    .replace(/<meta name="description"[^>]*>\s*/gi, '')
+    .replace(/<meta name="keywords"[^>]*>\s*/gi, '')
+    .replace(
+      '</head>',
+      `${metaTag('description', seoDescription)}${metaTag('keywords', seoKeywords)}  </head>`,
+    )
+    .replace(/(<span class="brand-title">)[\s\S]*?(<\/span>)/, `$1${escapeHtml(siteName)}$2`)
+    .replace(/(<span class="brand-subtitle">)[\s\S]*?(<\/span>)/, `$1${escapeHtml(seoDescription || '公开文档索引 · HTML / PDF / Word')}$2`)
+    .replace(/(<h1 class="section-title">)[\s\S]*?(<\/h1>)/, `$1${escapeHtml(siteName)}$2`)
+    .replace(/(<p class="section-note" id="listNote">)[\s\S]*?(<\/p>)/, `$1${escapeHtml(seoDescription || '按类型筛选、搜索并打开公开文档。')}$2`);
+  return reply.type('text/html').send(html);
 }
 
 function normalizedPublicType(value) {
@@ -226,8 +277,9 @@ function registerApiRoutes(app, prefix = '') {
 
   app.get(`${prefix}/api/session`, async (request) => {
     const session = currentSession(app, request);
-    if (!session) return { authenticated: false };
-    return { authenticated: true, username: session.username };
+    const publicSettings = app.store.getPublicSettings();
+    if (!session) return { authenticated: false, publicSettings };
+    return { authenticated: true, username: session.username, publicSettings };
   });
 
   app.post(`${prefix}/api/login`, async (request, reply) => {
@@ -261,22 +313,7 @@ function registerApiRoutes(app, prefix = '') {
   });
 
   app.post(`${prefix}/api/pages/upload`, async (request, reply) => {
-    const files = [];
-    const relativePaths = [];
-    for await (const part of request.parts()) {
-      if (part.type === 'field' && part.fieldname === 'relativePath') {
-        relativePaths.push(String(part.value || ''));
-        continue;
-      }
-      if (part.type !== 'file') continue;
-      const buffer = await part.toBuffer();
-      const relativePath = relativePaths.shift() || part.filename || '';
-      files.push({
-        fileName: path.basename(part.filename || relativePath || 'file'),
-        buffer,
-        relativePath,
-      });
-    }
+    const files = await collectUploadParts(request);
     let created;
     try {
       created = await app.store.importUploadFiles(files);
@@ -286,6 +323,35 @@ function registerApiRoutes(app, prefix = '') {
     }
     if (!created.length) return reply.code(400).send({ error: 'No supported files uploaded' });
     return reply.code(201).send({ pages: created.map(publicPage) });
+  });
+
+  app.post(`${prefix}/api/pages/upload/prepare`, async (request, reply) => {
+    const files = await collectUploadParts(request);
+    const staged = await app.store.stageUploadFiles(files);
+    if (!staged.documents.length) return reply.code(400).send({ error: 'No supported files uploaded' });
+    return reply.code(201).send(staged);
+  });
+
+  app.post(`${prefix}/api/pages/upload/:uploadId/confirm`, async (request, reply) => {
+    let created;
+    try {
+      created = await app.store.confirmStagedUpload(request.params.uploadId, request.body || {});
+    } catch (error) {
+      if (error.message === 'Upload batch not found') return reply.code(404).send({ error: error.message });
+      if (error.code === 'WORD_CONVERSION_FAILED') return reply.code(422).send({ error: error.message });
+      throw error;
+    }
+    if (!created.length) return reply.code(400).send({ error: 'No supported files uploaded' });
+    return reply.code(201).send({ pages: created.map(publicPage) });
+  });
+
+  app.delete(`${prefix}/api/pages/upload/:uploadId`, async (request, reply) => {
+    try {
+      await app.store.cancelStagedUpload(request.params.uploadId);
+    } catch {
+      return reply.code(404).send({ error: 'Upload batch not found' });
+    }
+    return reply.code(204).send();
   });
 
   app.get(`${prefix}/api/settings`, async () => ({
@@ -455,6 +521,8 @@ export function registerRoutes(app) {
   });
   app.get('/admin', async (request, reply) => sendAdmin(app, reply));
   app.get('/admin/', async (request, reply) => sendAdmin(app, reply));
+  app.get('/admin/settings', async (request, reply) => sendAdmin(app, reply));
+  app.get('/admin/settings/', async (request, reply) => sendAdmin(app, reply));
   app.get('/favicon.ico', async (request, reply) => reply.code(204).send());
 
   registerApiRoutes(app);
@@ -465,6 +533,16 @@ export function registerRoutes(app) {
   });
 
   app.get('/:slug/', async (request, reply) => {
+    if (isActiveAdminPath(`/${request.params.slug}`, app.store.getAdminPath())) return sendAdmin(app, reply);
+    return sendNotFound(reply, 'Page not found');
+  });
+
+  app.get('/:slug/settings', async (request, reply) => {
+    if (isActiveAdminPath(`/${request.params.slug}`, app.store.getAdminPath())) return sendAdmin(app, reply);
+    return sendNotFound(reply, 'Page not found');
+  });
+
+  app.get('/:slug/settings/', async (request, reply) => {
     if (isActiveAdminPath(`/${request.params.slug}`, app.store.getAdminPath())) return sendAdmin(app, reply);
     return sendNotFound(reply, 'Page not found');
   });

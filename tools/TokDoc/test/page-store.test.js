@@ -167,6 +167,51 @@ test('imports upload folders with sibling assets and injects a page asset base',
   await fs.access(path.join(path.dirname(pages[0].sourcePath), 'images', 'logo.png'));
 });
 
+test('stages uploads without inserting pages until confirmed and allows metadata edits', async (t) => {
+  const { store, db, dataDir, config } = await createStore();
+  t.after(() => db.close());
+  t.after(() => fs.rm(dataDir, { recursive: true, force: true }));
+
+  const staged = await store.stageUploadFiles([
+    {
+      fileName: 'index.html',
+      relativePath: 'launch/index.html',
+      buffer: Buffer.from('<!doctype html><html><head><title>原始标题</title></head><body><h1>原始标题</h1><img src="assets/logo.png"></body></html>'),
+    },
+    {
+      fileName: 'logo.png',
+      relativePath: 'launch/assets/logo.png',
+      buffer: Buffer.from('logo-bytes'),
+    },
+  ]);
+
+  assert.equal(store.listPages().length, 0);
+  assert.equal(staged.documents.length, 1);
+  assert.equal(staged.assetCount, 1);
+  assert.equal(staged.documents[0].title, '原始标题');
+  await fs.access(path.join(config.dataDir, 'pending-uploads', staged.uploadId, 'launch', 'index.html'));
+  await assert.rejects(() => fs.access(path.join(config.uploadsDir, '.pending', staged.uploadId, 'launch', 'index.html')));
+
+  const confirmed = await store.confirmStagedUpload(staged.uploadId, {
+    documents: [
+      {
+        id: staged.documents[0].id,
+        title: '确认后的标题',
+        fileName: 'campaign-final.html',
+      },
+    ],
+  });
+
+  assert.equal(confirmed.length, 1);
+  assert.equal(confirmed[0].title, '确认后的标题');
+  assert.equal(confirmed[0].fileName, 'campaign-final.html');
+  assert.equal(confirmed[0].directoryName, 'launch');
+  assert.match(path.basename(confirmed[0].generatedPath), new RegExp(`^\\d{8}-campaign-final-${confirmed[0].slug}\\.html$`));
+  assert.match(await store.readPageHtml(confirmed[0]), /<base data-tokdoc-base href="\/page-assets\/[^/]+\/launch\/">/);
+  assert.equal(store.listPages().length, 1);
+  await assert.rejects(() => store.confirmStagedUpload(staged.uploadId, {}), /Upload batch not found/);
+});
+
 test('injects configured tracking code into newly generated HTML pages', async (t) => {
   const { store, db, dataDir } = await createStore();
   t.after(() => db.close());

@@ -12,7 +12,7 @@ test('keeps the page list full width and moves watch directories into settings',
   const contentArea = html.match(/<section class="content-area"[\s\S]*?<\/section>/)?.[0] || '';
   const overview = html.match(/<section class="overview"[\s\S]*?<section class="content-area"/)?.[0] || '';
   const sideSummary = overview.match(/<aside class="panel side-summary"[\s\S]*?<\/aside>/)?.[0] || '';
-  const settingsDrawer = html.match(/<div class="drawer-backdrop" id="settingsBackdrop"[\s\S]*?<div class="modal-backdrop" id="previewBackdrop"/)?.[0] || '';
+  const settingsPage = html.match(/<main class="workspace settings-page" id="settingsPage"[\s\S]*?<\/main>/)?.[0] || '';
 
   assert.match(contentArea, /class="panel table-panel"/);
   assert.doesNotMatch(contentArea, /class="inspector"/);
@@ -20,23 +20,34 @@ test('keeps the page list full width and moves watch directories into settings',
   assert.doesNotMatch(sideSummary, /class="side-watch"/);
   assert.doesNotMatch(sideSummary, /读取文件/);
   assert.doesNotMatch(sideSummary, /解析元信息/);
-  assert.match(settingsDrawer, /id="watchList"/);
-  assert.match(settingsDrawer, /id="addWatchDirectory"/);
-  assert.match(settingsDrawer, /登录用户名/);
-  assert.match(settingsDrawer, /登录密码/);
-  assert.match(settingsDrawer, /后台访问目录/);
-  assert.match(settingsDrawer, /id="adminPathInput"/);
-  assert.match(settingsDrawer, /id="currentPasswordInput"/);
-  assert.match(settingsDrawer, /公开首页/);
-  assert.match(settingsDrawer, /id="publicHomepageEnabledInput"/);
-  assert.match(settingsDrawer, /线上绑定/);
-  assert.match(settingsDrawer, /id="remoteSyncEnabledInput"/);
-  assert.match(settingsDrawer, /id="remoteSyncUrlInput"/);
-  assert.match(settingsDrawer, /id="remoteSyncTokenInput"/);
+  assert.match(settingsPage, /id="watchList"/);
+  assert.match(settingsPage, /id="addWatchDirectory"/);
+  assert.match(settingsPage, /前台网站名称/);
+  assert.match(settingsPage, /id="siteNameInput"/);
+  assert.match(settingsPage, /后台名称/);
+  assert.match(settingsPage, /id="adminNameInput"/);
+  assert.match(settingsPage, /前台 SEO/);
+  assert.match(settingsPage, /id="publicSeoTitleInput"/);
+  assert.match(settingsPage, /id="publicSeoDescriptionInput"/);
+  assert.match(settingsPage, /id="publicSeoKeywordsInput"/);
+  assert.match(settingsPage, /登录用户名/);
+  assert.match(settingsPage, /登录密码/);
+  assert.match(settingsPage, /后台访问目录/);
+  assert.match(settingsPage, /id="adminPathInput"/);
+  assert.match(settingsPage, /id="currentPasswordInput"/);
+  assert.match(settingsPage, /公开首页/);
+  assert.match(settingsPage, /id="publicHomepageEnabledInput"/);
+  assert.match(settingsPage, /线上绑定/);
+  assert.match(settingsPage, /id="remoteSyncEnabledInput"/);
+  assert.match(settingsPage, /id="remoteSyncUrlInput"/);
+  assert.match(settingsPage, /id="remoteSyncTokenInput"/);
+  assert.doesNotMatch(html, /id="settingsBackdrop"/);
   assert.match(html, /id="loginBackdrop"/);
   assert.match(html, /TokDoc 本地文档管理器/);
   assert.match(html, /TokDoc 登录/);
   assert.match(html, /id="openPublicHome"/);
+  assert.match(html, /<a class="brand brand-link" id="adminHomeLink" href="\/admin" aria-label="返回后台首页">/);
+  assert.match(html, /href="\/admin\/settings"/);
   assert.doesNotMatch(html, /tokhtml 登录/);
   assert.match(html, /data-filter="trash"/);
   assert.match(html, /回收站/);
@@ -48,6 +59,11 @@ test('exposes PDF and Word document upload affordances in the manager UI', async
   assert.match(html, /上传 HTML、PDF 或 Word/);
   assert.match(html, /选择文件/);
   assert.match(html, /accept="\.html,\.htm,\.pdf,\.doc,\.docx,text\/html,application\/pdf"/);
+  assert.match(html, /id="uploadBackdrop"/);
+  assert.match(html, /id="uploadProgressBar"/);
+  assert.match(html, /id="uploadReviewRows"/);
+  assert.match(html, /id="confirmUpload"/);
+  assert.match(html, /上传完成后确认名称，确认后写入列表和数据库/);
   assert.match(html, /文档列表/);
   assert.match(html, /<th>类型<\/th>/);
   assert.match(html, /id="metaFileType"/);
@@ -76,4 +92,14 @@ test('opens public documents in a new tab and defaults public pagination to 10',
   assert.match(script, /target="_blank"/);
   assert.match(script, /rel="noopener noreferrer"/);
   assert.match(script, /window\.open\(row\.dataset\.url, '_blank', 'noopener,noreferrer'\)/);
+});
+
+test('stages uploads with progress before confirming them into the page list', async () => {
+  const script = await fs.readFile(path.resolve('public/app.js'), 'utf8');
+
+  assert.match(script, /XMLHttpRequest/);
+  assert.match(script, /\/api\/pages\/upload\/prepare/);
+  assert.match(script, /\/api\/pages\/upload\/.*confirm/);
+  assert.match(script, /uploadReviewDocuments/);
+  assert.match(script, /确认入库/);
 });

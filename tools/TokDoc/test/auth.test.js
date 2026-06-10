@@ -51,6 +51,10 @@ test('requires login for management APIs and keeps a long-lived session cookie',
   assert.equal(admin.statusCode, 200);
   assert.match(admin.body, /TokDoc 登录/);
 
+  const adminSettings = await app.inject({ method: 'GET', url: '/admin/settings' });
+  assert.equal(adminSettings.statusCode, 200);
+  assert.match(adminSettings.body, /id="settingsPage"/);
+
   const health = await app.inject({ method: 'GET', url: '/api/health' });
   assert.equal(health.statusCode, 200);
   assert.equal(health.json().name, 'tokdoc');
@@ -201,6 +205,9 @@ test('moves the management console and APIs under a custom admin path', async (t
   const oldAdmin = await app.inject({ method: 'GET', url: '/admin' });
   assert.equal(oldAdmin.statusCode, 404);
 
+  const oldAdminSettings = await app.inject({ method: 'GET', url: '/admin/settings' });
+  assert.equal(oldAdminSettings.statusCode, 404);
+
   const oldLogin = await app.inject({
     method: 'POST',
     url: '/api/login',
@@ -214,6 +221,10 @@ test('moves the management console and APIs under a custom admin path', async (t
   const customAdmin = await app.inject({ method: 'GET', url: '/tok-ops' });
   assert.equal(customAdmin.statusCode, 200);
   assert.match(customAdmin.body, /TokDoc 登录/);
+
+  const customSettings = await app.inject({ method: 'GET', url: '/tok-ops/settings' });
+  assert.equal(customSettings.statusCode, 200);
+  assert.match(customSettings.body, /id="settingsPage"/);
 
   const customLogin = await app.inject({
     method: 'POST',
@@ -449,6 +460,52 @@ test('allows changing login username and password from settings', async (t) => {
     payload: { username: 'yao', password: 'new-secret' },
   });
   assert.equal(newLogin.statusCode, 200);
+});
+
+test('saves display names and injects public homepage SEO settings', async (t) => {
+  const { app, dataDir } = await createApp();
+  t.after(async () => {
+    await app.close();
+    await fs.rm(dataDir, { recursive: true, force: true });
+  });
+
+  const login = await app.inject({
+    method: 'POST',
+    url: '/api/login',
+    payload: { username: 'admin', password: 'tokdoc' },
+  });
+  const cookie = sessionCookie(login);
+
+  const saved = await app.inject({
+    method: 'PATCH',
+    url: '/api/settings',
+    headers: { cookie },
+    payload: {
+      siteName: '移山公开资料库',
+      adminName: '移山文档后台',
+      publicSeoTitle: '移山资料中心',
+      publicSeoDescription: '面向公开阅读的资料索引。',
+      publicSeoKeywords: '移山,资料,文档',
+    },
+  });
+  assert.equal(saved.statusCode, 200);
+  assert.equal(saved.json().settings.siteName, '移山公开资料库');
+  assert.equal(saved.json().settings.adminName, '移山文档后台');
+  assert.equal(saved.json().settings.publicSeoTitle, '移山资料中心');
+
+  const session = await app.inject({ method: 'GET', url: '/api/session' });
+  assert.equal(session.statusCode, 200);
+  assert.equal(session.json().publicSettings.adminName, '移山文档后台');
+  assert.equal(Object.hasOwn(session.json().publicSettings, 'remoteSyncUrl'), false);
+
+  const root = await app.inject({ method: 'GET', url: '/' });
+  assert.equal(root.statusCode, 200);
+  assert.match(root.body, /<title>移山资料中心<\/title>/);
+  assert.match(root.body, /<meta name="description" content="面向公开阅读的资料索引。" \/>/);
+  assert.match(root.body, /<meta name="keywords" content="移山,资料,文档" \/>/);
+  assert.match(root.body, /<span class="brand-title">移山公开资料库<\/span>/);
+  assert.match(root.body, /<h1 class="section-title">移山公开资料库<\/h1>/);
+  assert.match(root.body, /<p class="section-note" id="listNote">面向公开阅读的资料索引。<\/p>/);
 });
 
 test('hides deleted generated pages until they are restored from the recycle bin', async (t) => {
