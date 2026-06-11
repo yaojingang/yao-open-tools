@@ -29,6 +29,7 @@ export function createDb(config) {
       checksum TEXT NOT NULL,
       edited INTEGER NOT NULL DEFAULT 0,
       access_count INTEGER NOT NULL DEFAULT 0,
+      visibility TEXT NOT NULL DEFAULT 'public',
       deleted_at TEXT,
       deleted_path TEXT
     );
@@ -83,6 +84,10 @@ export function createDb(config) {
   if (!pageColumns.includes('mime_type')) {
     db.exec("ALTER TABLE pages ADD COLUMN mime_type TEXT NOT NULL DEFAULT 'text/html; charset=utf-8';");
   }
+  if (!pageColumns.includes('visibility')) {
+    db.exec("ALTER TABLE pages ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public';");
+  }
   db.exec('CREATE INDEX IF NOT EXISTS idx_pages_deleted_at ON pages(deleted_at);');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_pages_visibility ON pages(visibility);');
   return db;
 }

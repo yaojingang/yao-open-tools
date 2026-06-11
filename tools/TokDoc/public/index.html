@@ -703,7 +703,7 @@
 
       table {
         width: 100%;
-        min-width: 920px;
+        min-width: 980px;
         border-collapse: collapse;
         table-layout: fixed;
       }
@@ -734,6 +734,10 @@
 
       .col-access {
         width: 70px;
+      }
+
+      .col-visibility {
+        width: 78px;
       }
 
       .col-status {
@@ -914,6 +918,18 @@
       .badge-violet {
         color: var(--violet);
         background: var(--violet-soft);
+      }
+
+      .visibility-toggle {
+        border: 0;
+        appearance: none;
+        cursor: pointer;
+        font-family: inherit;
+      }
+
+      .visibility-toggle:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
       }
 
       .actions {
@@ -1354,7 +1370,7 @@
       }
 
       .upload-review-row {
-        grid-template-columns: 84px minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-columns: 84px minmax(0, 1fr) minmax(0, 1fr) 132px;
         padding: 12px;
         border: 1px solid var(--line);
         border-radius: 8px;
@@ -2000,6 +2016,7 @@
                   <col class="col-size" />
                   <col class="col-directory" />
                   <col class="col-access" />
+                  <col class="col-visibility" />
                   <col class="col-status" />
                   <col class="col-actions" />
                 </colgroup>
@@ -2012,6 +2029,7 @@
                     <th>大小</th>
                     <th>目录名称</th>
                     <th>访问次数</th>
+                    <th>可见性</th>
                     <th>状态</th>
                     <th>操作</th>
                   </tr>
@@ -2315,6 +2333,7 @@
               <div class="meta-item"><span>文件名</span><strong id="metaFileName"></strong></div>
               <div class="meta-item"><span>标题</span><strong id="metaTitle"></strong></div>
               <div class="meta-item"><span>类型</span><strong id="metaFileType"></strong></div>
+              <div class="meta-item"><span>可见性</span><strong id="metaVisibility"></strong></div>
               <div class="meta-item"><span>上传时间</span><strong id="metaUploadTime"></strong></div>
               <div class="meta-item"><span>本地 URL</span><strong id="metaUrl"></strong></div>
             </div>

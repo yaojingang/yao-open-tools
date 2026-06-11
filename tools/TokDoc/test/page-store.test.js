@@ -189,6 +189,7 @@ test('stages uploads without inserting pages until confirmed and allows metadata
   assert.equal(staged.documents.length, 1);
   assert.equal(staged.assetCount, 1);
   assert.equal(staged.documents[0].title, '原始标题');
+  assert.equal(staged.documents[0].visibility, 'public');
   await fs.access(path.join(config.dataDir, 'pending-uploads', staged.uploadId, 'launch', 'index.html'));
   await assert.rejects(() => fs.access(path.join(config.uploadsDir, '.pending', staged.uploadId, 'launch', 'index.html')));
 
@@ -198,6 +199,7 @@ test('stages uploads without inserting pages until confirmed and allows metadata
         id: staged.documents[0].id,
         title: '确认后的标题',
         fileName: 'campaign-final.html',
+        visibility: 'private',
       },
     ],
   });
@@ -205,6 +207,7 @@ test('stages uploads without inserting pages until confirmed and allows metadata
   assert.equal(confirmed.length, 1);
   assert.equal(confirmed[0].title, '确认后的标题');
   assert.equal(confirmed[0].fileName, 'campaign-final.html');
+  assert.equal(confirmed[0].visibility, 'private');
   assert.equal(confirmed[0].directoryName, 'launch');
   assert.match(path.basename(confirmed[0].generatedPath), new RegExp(`^\\d{8}-campaign-final-${confirmed[0].slug}\\.html$`));
   assert.match(await store.readPageHtml(confirmed[0]), /<base data-tokdoc-base href="\/page-assets\/[^/]+\/launch\/">/);
@@ -348,6 +351,12 @@ test('builds a public page list with type filters and public-only fields', async
     relativePath: 'docs/public-pdf.pdf',
     buffer: Buffer.from('%PDF-1.4\npublic pdf\n'),
   });
+  const privatePage = await store.importBuffer({
+    fileName: 'private-html.html',
+    relativePath: 'docs/private-html.html',
+    buffer: Buffer.from('<!doctype html><html><head><title>私有 HTML</title></head><body><h1>私有 HTML</h1></body></html>'),
+    visibility: 'private',
+  });
   const trashed = await store.importBuffer({
     fileName: 'trashed.html',
     relativePath: 'trash/trashed.html',
@@ -361,12 +370,18 @@ test('builds a public page list with type filters and public-only fields', async
   assert.equal(all.pages.length, 2);
   assert.equal(all.pagination.pageSize, 10);
   assert.deepEqual(all.stats, { all: 2, html: 1, pdf: 1, word: 0 });
+  assert.equal(all.pages.some((page) => page.slug === privatePage.slug), false);
   assert.equal(all.pages[0].url.startsWith('/'), true);
   assert.equal(Object.hasOwn(all.pages[0], 'id'), false);
   assert.equal(Object.hasOwn(all.pages[0], 'sourcePath'), false);
   assert.equal(Object.hasOwn(all.pages[0], 'generatedPath'), false);
   assert.equal(Object.hasOwn(all.pages[0], 'editUrl'), false);
   assert.equal(Object.hasOwn(all.pages[0], 'revision'), false);
+  assert.equal(Object.hasOwn(all.pages[0], 'visibility'), false);
+
+  const privateList = store.listPages({ visibility: 'private' });
+  assert.equal(privateList.length, 1);
+  assert.equal(privateList[0].slug, privatePage.slug);
 
   const html = store.listPublicPagesPage({ type: 'html' });
   assert.equal(html.pages.length, 1);

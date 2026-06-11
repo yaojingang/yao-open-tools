@@ -236,6 +236,18 @@ function fileTypeBadgeClassFromType(type) {
   return fileTypeBadgeClass({ fileType: type || 'html' });
 }
 
+function isPrivatePage(page) {
+  return page?.visibility === 'private';
+}
+
+function visibilityLabel(page) {
+  return isPrivatePage(page) ? '仅自己' : '公开';
+}
+
+function visibilityBadgeClass(page) {
+  return isPrivatePage(page) ? 'badge-warning' : 'badge-success';
+}
+
 function pageUrl(page) {
   return page.url || `/${page.slug}`;
 }
@@ -380,6 +392,7 @@ function render() {
       const missing = page.status === 'missing';
       const statusClass = trashed || missing ? 'badge-warning' : page.edited ? 'badge-violet' : 'badge-success';
       const statusText = trashed ? '回收站' : missing ? '源文件缺失' : page.edited ? '已编辑' : '已生成';
+      const nextVisibility = isPrivatePage(page) ? 'public' : 'private';
       const editButton = isHtmlPage(page)
         ? `<button class="btn icon-btn" type="button" title="直接编辑" aria-label="直接编辑" data-action="edit" data-id="${page.id}">${icons.edit}</button>`
         : '';
@@ -407,6 +420,13 @@ function render() {
         <td><span class="size-cell">${escapeHtml(formatSize(page.size))}</span></td>
         <td><span class="directory-cell" title="${escapeHtml(page.directoryName || '无目录')}">${escapeHtml(page.directoryName || '-')}</span></td>
         <td><span class="access-cell">${Number(page.accessCount || 0)}</span></td>
+        <td>
+          ${
+            trashed
+              ? `<span class="badge ${visibilityBadgeClass(page)}">${visibilityLabel(page)}</span>`
+              : `<button class="badge visibility-toggle ${visibilityBadgeClass(page)}" type="button" title="点击切换为${nextVisibility === 'private' ? '仅自己可见' : '公开'}" data-action="visibility" data-id="${page.id}" data-visibility="${nextVisibility}">${visibilityLabel(page)}</button>`
+          }
+        </td>
         <td><span class="badge ${statusClass}"><span class="status-dot"></span>${statusText}</span></td>
         <td class="actions-cell">
           <div class="actions">
@@ -419,7 +439,7 @@ function render() {
 
   if (!pages.length) {
     const emptyText = activeFilter === 'trash' ? '回收站为空' : '暂无匹配页面';
-    els.rows.innerHTML = `<tr><td colspan="9" style="height:120px;text-align:center;color:var(--muted)">${emptyText}</td></tr>`;
+    els.rows.innerHTML = `<tr><td colspan="10" style="height:120px;text-align:center;color:var(--muted)">${emptyText}</td></tr>`;
   }
 
   renderPagination();
@@ -519,6 +539,13 @@ function renderUploadReview(upload) {
           <span>文件名称</span>
           <input data-upload-field="fileName" value="${escapeHtml(item.fileName || '')}" placeholder="生成文件名和列表副标题" />
         </label>
+        <label class="field">
+          <span>可见性</span>
+          <select data-upload-field="visibility">
+            <option value="public" ${(item.visibility || 'public') === 'public' ? 'selected' : ''}>公开</option>
+            <option value="private" ${item.visibility === 'private' ? 'selected' : ''}>仅自己可见</option>
+          </select>
+        </label>
       </div>`,
     )
     .join('');
@@ -531,6 +558,7 @@ function uploadReviewDocuments() {
     id: row.dataset.uploadDocId,
     title: row.querySelector('[data-upload-field="title"]').value.trim(),
     fileName: row.querySelector('[data-upload-field="fileName"]').value.trim(),
+    visibility: row.querySelector('[data-upload-field="visibility"]').value,
   }));
 }
 
@@ -697,6 +725,7 @@ function openPreview(id) {
   document.querySelector('#metaFileName').textContent = page.fileName;
   document.querySelector('#metaTitle').textContent = page.title;
   document.querySelector('#metaFileType').textContent = fileTypeLabel(page);
+  document.querySelector('#metaVisibility').textContent = isPrivatePage(page) ? '仅自己可见' : '公开';
   document.querySelector('#metaUploadTime').textContent = page.uploadTime || page.updatedTime || '-';
   document.querySelector('#metaUrl').textContent = pageUrl(page);
   document.querySelector('#editFromPreview').hidden = !isHtmlPage(page);
@@ -764,6 +793,18 @@ async function syncPage(id) {
   }
   await api(`/api/pages/${encodeURIComponent(id)}/sync`, { method: 'POST' });
   showToast('已上传到线上程序');
+}
+
+async function updateVisibility(id, visibility) {
+  const page = findPage(id);
+  const nextVisibility = visibility === 'private' ? 'private' : 'public';
+  await api(`/api/pages/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ visibility: nextVisibility }),
+  });
+  await loadData();
+  showToast(`${page?.title || '文档'}已设为${nextVisibility === 'private' ? '仅自己可见' : '公开'}`);
 }
 
 async function saveSettings() {
@@ -955,6 +996,7 @@ els.rows.addEventListener('click', (event) => {
   if (action === 'delete') deletePage(id).catch((error) => showToast(error.message));
   if (action === 'restore') restorePage(id).catch((error) => showToast(error.message));
   if (action === 'sync') syncPage(id).catch((error) => showToast(error.message));
+  if (action === 'visibility') updateVisibility(id, button.dataset.visibility).catch((error) => showToast(error.message));
 });
 
 els.watchList.addEventListener('click', async (event) => {

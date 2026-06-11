@@ -204,6 +204,8 @@ async function sendGeneratedPage(app, request, reply, rawSlug) {
   if (!/^[a-z0-9]{6}$/.test(slug)) return sendNotFound(reply, 'Page not found');
   const page = app.store.getActivePageBySlug(slug);
   if (!page) return sendNotFound(reply, 'Page not found');
+  const session = currentSession(app, request);
+  if (page.visibility === 'private' && !session) return sendNotFound(reply, 'Page not found');
   app.store.incrementAccessCount(page.id);
   if (request.query?.edit === '1' && page.fileType !== 'html') {
     return reply.code(400).send({ error: 'Document assets cannot be edited online' });
@@ -387,6 +389,14 @@ function registerApiRoutes(app, prefix = '') {
   app.post(`${prefix}/api/pages/samples`, async (request, reply) => {
     const pages = await app.store.addSamplePages();
     return reply.code(201).send({ pages: pages.map(publicPage) });
+  });
+
+  app.patch(`${prefix}/api/pages/:id`, async (request, reply) => {
+    const body = request.body || {};
+    if (!Object.hasOwn(body, 'visibility')) return reply.code(400).send({ error: 'visibility is required' });
+    const page = app.store.updatePageVisibility(request.params.id, body.visibility);
+    if (!page) return sendNotFound(reply, 'Page not found');
+    return { page: publicPage(page) };
   });
 
   app.patch(`${prefix}/api/pages/:id/content`, async (request, reply) => {

@@ -61,6 +61,25 @@ function generatedFileNameForAsset(page, extension = 'html') {
   return `${dateStamp(page.createdAt)}-${cleanName}-${page.slug}.${extension.replace(/^\./, '')}`;
 }
 
+function normalizeVisibility(value) {
+  return String(value || '').trim().toLowerCase() === 'private' ? 'private' : 'public';
+}
+
+function isPathInside(parentPath, childPath) {
+  const parent = path.resolve(parentPath);
+  const child = path.resolve(childPath);
+  return child === parent || child.startsWith(`${parent}${path.sep}`);
+}
+
+function cleanAssetRelativePath(value = '') {
+  return String(value || '')
+    .replace(/\\/g, '/')
+    .split('/')
+    .map((part) => part.trim())
+    .filter((part) => part && part !== '.' && part !== '..')
+    .join('/');
+}
+
 async function pathExists(filePath) {
   if (!filePath) return false;
   try {
@@ -96,6 +115,7 @@ function rowToPage(row) {
     checksum: row.checksum,
     edited: Boolean(row.edited),
     accessCount: row.access_count || 0,
+    visibility: normalizeVisibility(row.visibility),
     deletedAt: row.deleted_at || '',
     deletedTime: row.deleted_at ? displayTime(row.deleted_at) : '',
     deletedPath: row.deleted_path || '',
@@ -122,7 +142,7 @@ function rowToWatchDir(row) {
 }
 
 function isPublicListablePage(page) {
-  return Boolean(page && !page.deletedAt && ['published', 'edited'].includes(page.status));
+  return Boolean(page && page.visibility !== 'private' && !page.deletedAt && ['published', 'edited'].includes(page.status));
 }
 
 function publicPageSummary(page) {
@@ -251,6 +271,8 @@ export class PageStore {
     const status = String(filters.status || 'all');
     const directory = String(filters.directory || '').trim();
     const requestedType = String(filters.type || filters.fileType || 'all').trim().toLowerCase();
+    const visibilityInput = String(filters.visibility || 'all').trim().toLowerCase();
+    const requestedVisibility = ['public', 'private'].includes(visibilityInput) ? visibilityInput : 'all';
     const sort = String(filters.sort || 'updated_desc');
     const scope = String(filters.scope || 'active');
     const wantsTrash = scope === 'trash' || status === 'trashed';
@@ -266,9 +288,10 @@ export class PageStore {
           !status ||
           (status === 'published' && page.status === 'published') ||
           (status === 'edited' && page.edited);
+        const matchesVisibility = requestedVisibility === 'all' || page.visibility === requestedVisibility;
         const matchesDirectory = !directory || page.directoryName === directory;
         const haystack = `${page.id} ${page.slug} ${page.fileName} ${page.title} ${page.directoryName} ${page.url}`.toLowerCase();
-        return matchesType && matchesStatus && matchesDirectory && (!q || haystack.includes(q));
+        return matchesType && matchesStatus && matchesVisibility && matchesDirectory && (!q || haystack.includes(q));
       });
     if (sort === 'created_desc') {
       return pages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -354,6 +377,33 @@ export class PageStore {
     return rowToPage(this.db.prepare('SELECT * FROM pages WHERE slug = ? AND deleted_at IS NULL').get(slug));
   }
 
+  updatePageVisibility(id, visibility) {
+    const page = this.getPage(id);
+    if (!page || page.deletedAt) return null;
+    const nextVisibility = normalizeVisibility(visibility);
+    this.db.prepare('UPDATE pages SET visibility = ?, updated_at = ? WHERE id = ?').run(nextVisibility, nowIso(), id);
+    return this.getPage(id);
+  }
+
+  assetPathVisibility(uploadRootId, assetRelativePath = '') {
+    const safeUploadRootId = String(uploadRootId || '');
+    if (!/^[a-z0-9-]{20,80}$/i.test(safeUploadRootId)) return 'private';
+    const safeRelativePath = cleanAssetRelativePath(assetRelativePath);
+    if (!safeRelativePath) return 'private';
+    const root = path.resolve(this.config.uploadsDir, safeUploadRootId);
+    const assetPath = path.resolve(root, ...safeRelativePath.split('/'));
+    if (!isPathInside(root, assetPath)) return 'private';
+    const rows = this.db.prepare('SELECT source_path, visibility, deleted_at FROM pages WHERE source_path IS NOT NULL').all();
+    const matchingPages = rows.filter((row) => {
+      if (row.deleted_at) return false;
+      const sourcePath = path.resolve(row.source_path || '');
+      if (!isPathInside(root, sourcePath)) return false;
+      return assetPath === sourcePath || isPathInside(path.dirname(sourcePath), assetPath);
+    });
+    if (!matchingPages.length) return 'private';
+    return matchingPages.some((row) => normalizeVisibility(row.visibility) === 'public') ? 'public' : 'private';
+  }
+
   async readPageHtml(page) {
     return fs.readFile(await this.resolveGeneratedPath(page), 'utf8');
   }
@@ -381,8 +431,8 @@ export class PageStore {
     return storedPath;
   }
 
-  async importBuffer({ fileName, buffer, relativePath = '' }) {
-    const [page] = await this.importUploadFiles([{ fileName, buffer, relativePath }]);
+  async importBuffer({ fileName, buffer, relativePath = '', visibility = 'public' }) {
+    const [page] = await this.importUploadFiles([{ fileName, buffer, relativePath, visibility }]);
     return page;
   }
 
@@ -453,6 +503,7 @@ export class PageStore {
         fileName: file.fileName,
         title,
         fileType,
+        visibility: 'public',
         directoryName: parentDirectoryNameFromRelative(file.relativePath),
         size: file.buffer.length,
       };
@@ -498,10 +549,12 @@ export class PageStore {
       const edit = editsById.get(document.id) || {};
       const fileName = editableUploadFileName(edit.fileName, document.fileName);
       const title = String(edit.title || document.title || '').trim();
+      const visibility = normalizeVisibility(edit.visibility || document.visibility);
       importFiles.push({
         id: document.id,
         title,
         fileName,
+        visibility,
         relativePath: replaceRelativeBasename(document.relativePath, fileName),
         buffer,
       });
@@ -524,6 +577,7 @@ export class PageStore {
         return {
           id: file.id,
           title: String(file.title || '').trim(),
+          visibility: normalizeVisibility(file.visibility),
           fileName: path.posix.basename(relativePath) || path.basename(file.fileName || 'file'),
           relativePath,
           buffer: file.buffer,
@@ -557,6 +611,7 @@ export class PageStore {
             fileName: file.fileName,
             content,
             title: file.title,
+            visibility: file.visibility,
             sourceType: 'upload',
             sourcePath,
             directoryName: parentDirectoryNameFromRelative(file.relativePath),
@@ -571,6 +626,7 @@ export class PageStore {
           id: file.id || crypto.randomUUID(),
           fileName: file.fileName,
           title: file.title,
+          visibility: file.visibility,
           buffer: file.buffer,
           sourceType: 'upload',
           sourcePath,
@@ -614,13 +670,25 @@ export class PageStore {
           sourcePath: null,
           directoryName: '',
           rawMtimeMs: null,
+          visibility: 'public',
         }),
       );
     }
     return created;
   }
 
-  async createPageFromContent({ id, fileName, content, title, sourceType, sourcePath, directoryName, rawMtimeMs, assetBaseUrl: pageAssetBaseUrl = '' }) {
+  async createPageFromContent({
+    id,
+    fileName,
+    content,
+    title,
+    sourceType,
+    sourcePath,
+    directoryName,
+    rawMtimeMs,
+    visibility = 'public',
+    assetBaseUrl: pageAssetBaseUrl = '',
+  }) {
     const createdAt = nowIso();
     const parsed = parseHtmlMetadata(content, fileName);
     const pageTitle = String(title || '').trim() || parsed.title;
@@ -648,12 +716,13 @@ export class PageStore {
       checksum: checksum(content),
       edited: 0,
       accessCount: 0,
+      visibility: normalizeVisibility(visibility),
     };
     this.insertPage(info);
     return this.getPage(id);
   }
 
-  async createDocumentAsset({ id, fileName, title, buffer, sourceType, sourcePath, directoryName, rawMtimeMs, fileType }) {
+  async createDocumentAsset({ id, fileName, title, buffer, sourceType, sourcePath, directoryName, rawMtimeMs, fileType, visibility = 'public' }) {
     const createdAt = nowIso();
     const slug = this.uniqueManagedSlug();
     const generatedPath = path.join(this.config.generatedDir, generatedFileNameForAsset({ slug, fileName, createdAt }, 'pdf'));
@@ -685,6 +754,7 @@ export class PageStore {
       checksum: checksum(buffer),
       edited: 0,
       accessCount: 0,
+      visibility: normalizeVisibility(visibility),
     };
     this.insertPage(info);
     return this.getPage(id);
@@ -713,8 +783,8 @@ export class PageStore {
       .prepare(
         `INSERT INTO pages (
           id, slug, file_name, title, source_type, source_path, directory_name, size, status,
-          created_at, updated_at, revision, generated_path, file_type, mime_type, raw_mtime_ms, checksum, edited, access_count
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          created_at, updated_at, revision, generated_path, file_type, mime_type, raw_mtime_ms, checksum, edited, access_count, visibility
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         info.id,
@@ -736,6 +806,7 @@ export class PageStore {
         info.checksum,
         info.edited,
         info.accessCount,
+        normalizeVisibility(info.visibility),
       );
   }
 

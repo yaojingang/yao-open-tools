@@ -66,7 +66,9 @@ test('exposes PDF and Word document upload affordances in the manager UI', async
   assert.match(html, /上传完成后确认名称，确认后写入列表和数据库/);
   assert.match(html, /文档列表/);
   assert.match(html, /<th>类型<\/th>/);
+  assert.match(html, /<th>可见性<\/th>/);
   assert.match(html, /id="metaFileType"/);
+  assert.match(html, /id="metaVisibility"/);
   assert.match(html, /id="editFromPreview"/);
 });
 
@@ -101,5 +103,7 @@ test('stages uploads with progress before confirming them into the page list', a
   assert.match(script, /\/api\/pages\/upload\/prepare/);
   assert.match(script, /\/api\/pages\/upload\/.*confirm/);
   assert.match(script, /uploadReviewDocuments/);
+  assert.match(script, /data-upload-field="visibility"/);
+  assert.match(script, /data-action="visibility"/);
   assert.match(script, /确认入库/);
 });

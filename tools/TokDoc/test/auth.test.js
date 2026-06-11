@@ -270,6 +270,12 @@ test('serves a public document index and filters public API fields without login
     relativePath: 'pdf/public-index-pdf.pdf',
     buffer: Buffer.from('%PDF-1.4\npublic index pdf\n'),
   });
+  const privatePage = await app.store.importBuffer({
+    fileName: 'private-index-html.html',
+    relativePath: 'docs/private-index-html.html',
+    buffer: Buffer.from('<!doctype html><html><head><title>私有索引 HTML</title></head><body><h1>私有索引 HTML</h1></body></html>'),
+    visibility: 'private',
+  });
   const trashPage = await app.store.importBuffer({
     fileName: 'public-index-trash.html',
     relativePath: 'trash/public-index-trash.html',
@@ -293,6 +299,7 @@ test('serves a public document index and filters public API fields without login
   assert.deepEqual(body.stats, { all: 2, html: 1, pdf: 1, word: 0 });
   assert.equal(body.pages.some((page) => page.slug === htmlPage.slug), true);
   assert.equal(body.pages.some((page) => page.slug === pdfPage.slug), true);
+  assert.equal(body.pages.some((page) => page.slug === privatePage.slug), false);
   assert.equal(body.pages.some((page) => page.slug === trashPage.slug), false);
   assert.equal(Object.hasOwn(body.pages[0], 'id'), false);
   assert.equal(Object.hasOwn(body.pages[0], 'sourcePath'), false);
@@ -300,6 +307,7 @@ test('serves a public document index and filters public API fields without login
   assert.equal(Object.hasOwn(body.pages[0], 'editUrl'), false);
   assert.equal(Object.hasOwn(body.pages[0], 'canEdit'), false);
   assert.equal(Object.hasOwn(body.pages[0], 'revision'), false);
+  assert.equal(Object.hasOwn(body.pages[0], 'visibility'), false);
 
   const htmlApi = await app.inject({ method: 'GET', url: '/public/api/pages?type=html' });
   assert.equal(htmlApi.statusCode, 200);
@@ -370,6 +378,126 @@ test('allows public generated page views but protects edit mode', async (t) => {
   const editAllowed = await app.inject({ method: 'GET', url: `${page.url}?edit=1`, headers: { cookie: sessionCookie(login) } });
   assert.equal(editAllowed.statusCode, 200);
   assert.match(editAllowed.body, /tokdoc/);
+});
+
+test('hides private documents from the public frontend while allowing logged-in backend views', async (t) => {
+  const { app, dataDir } = await createApp();
+  t.after(async () => {
+    await app.close();
+    await fs.rm(dataDir, { recursive: true, force: true });
+  });
+
+  const [page] = await app.store.importUploadFiles([
+    {
+      fileName: 'index.html',
+      relativePath: 'private/index.html',
+      buffer: Buffer.from('<!doctype html><html><head><title>私有页面</title></head><body><h1>私有页面</h1><img src="assets/logo.png"></body></html>'),
+      visibility: 'private',
+    },
+    {
+      fileName: 'logo.png',
+      relativePath: 'private/assets/logo.png',
+      buffer: Buffer.from('private-logo'),
+    },
+  ]);
+  const uploadRootId = path.relative(app.config.uploadsDir, page.sourcePath).split(path.sep)[0];
+  const assetUrl = `/page-assets/${uploadRootId}/private/assets/logo.png`;
+
+  const publicApi = await app.inject({ method: 'GET', url: '/public/api/pages' });
+  assert.equal(publicApi.statusCode, 200);
+  assert.equal(publicApi.json().pages.some((item) => item.slug === page.slug), false);
+
+  const publicView = await app.inject({ method: 'GET', url: page.url });
+  assert.equal(publicView.statusCode, 404);
+  const publicAsset = await app.inject({ method: 'GET', url: assetUrl });
+  assert.equal(publicAsset.statusCode, 404);
+
+  const login = await app.inject({
+    method: 'POST',
+    url: '/api/login',
+    payload: { username: 'admin', password: 'tokdoc' },
+  });
+  const cookie = sessionCookie(login);
+  const backendView = await app.inject({ method: 'GET', url: page.url, headers: { cookie } });
+  assert.equal(backendView.statusCode, 200);
+  assert.match(backendView.body, /私有页面/);
+  const backendAsset = await app.inject({ method: 'GET', url: assetUrl, headers: { cookie } });
+  assert.equal(backendAsset.statusCode, 200);
+  assert.equal(backendAsset.body, 'private-logo');
+
+  const update = await app.inject({
+    method: 'PATCH',
+    url: `/api/pages/${page.id}`,
+    headers: { cookie },
+    payload: { visibility: 'public' },
+  });
+  assert.equal(update.statusCode, 200);
+  assert.equal(update.json().page.visibility, 'public');
+
+  const publicViewAfterUpdate = await app.inject({ method: 'GET', url: page.url });
+  assert.equal(publicViewAfterUpdate.statusCode, 200);
+  assert.match(publicViewAfterUpdate.body, /私有页面/);
+  const publicAssetAfterUpdate = await app.inject({ method: 'GET', url: assetUrl });
+  assert.equal(publicAssetAfterUpdate.statusCode, 200);
+  assert.equal(publicAssetAfterUpdate.body, 'private-logo');
+});
+
+test('protects private folder assets in mixed public and private upload batches', async (t) => {
+  const { app, dataDir } = await createApp();
+  t.after(async () => {
+    await app.close();
+    await fs.rm(dataDir, { recursive: true, force: true });
+  });
+
+  const [publicPage, privatePage] = await app.store.importUploadFiles([
+    {
+      fileName: 'index.html',
+      relativePath: 'public/index.html',
+      buffer: Buffer.from('<!doctype html><html><head><title>公开批次</title></head><body><h1>公开批次</h1><img src="assets/logo.png"></body></html>'),
+      visibility: 'public',
+    },
+    {
+      fileName: 'public-logo.png',
+      relativePath: 'public/assets/logo.png',
+      buffer: Buffer.from('public-logo'),
+    },
+    {
+      fileName: 'index.html',
+      relativePath: 'private/index.html',
+      buffer: Buffer.from('<!doctype html><html><head><title>私有批次</title></head><body><h1>私有批次</h1><img src="assets/logo.png"></body></html>'),
+      visibility: 'private',
+    },
+    {
+      fileName: 'private-logo.png',
+      relativePath: 'private/assets/logo.png',
+      buffer: Buffer.from('private-logo'),
+    },
+  ]);
+  const uploadRootId = path.relative(app.config.uploadsDir, publicPage.sourcePath).split(path.sep)[0];
+  assert.equal(path.relative(app.config.uploadsDir, privatePage.sourcePath).split(path.sep)[0], uploadRootId);
+  const publicAssetUrl = `/page-assets/${uploadRootId}/public/assets/logo.png`;
+  const privateAssetUrl = `/page-assets/${uploadRootId}/private/assets/logo.png`;
+
+  const publicView = await app.inject({ method: 'GET', url: publicPage.url });
+  assert.equal(publicView.statusCode, 200);
+  assert.match(publicView.body, /公开批次/);
+  const privateView = await app.inject({ method: 'GET', url: privatePage.url });
+  assert.equal(privateView.statusCode, 404);
+
+  const publicAsset = await app.inject({ method: 'GET', url: publicAssetUrl });
+  assert.equal(publicAsset.statusCode, 200);
+  assert.equal(publicAsset.body, 'public-logo');
+  const privateAsset = await app.inject({ method: 'GET', url: privateAssetUrl });
+  assert.equal(privateAsset.statusCode, 404);
+
+  const login = await app.inject({
+    method: 'POST',
+    url: '/api/login',
+    payload: { username: 'admin', password: 'tokdoc' },
+  });
+  const backendPrivateAsset = await app.inject({ method: 'GET', url: privateAssetUrl, headers: { cookie: sessionCookie(login) } });
+  assert.equal(backendPrivateAsset.statusCode, 200);
+  assert.equal(backendPrivateAsset.body, 'private-logo');
 });
 
 test('serves uploaded PDF documents publicly and blocks edit mode for non-HTML assets', async (t) => {
