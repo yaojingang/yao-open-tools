@@ -14,6 +14,7 @@ Yao 的开源小工具集合，面向本地优先的 AI 编码、开发者效率
 - 浏览器页面截图、长页面留档、主体内容裁剪和多格式导出。
 - 浏览器网页和 PDF 的英译中辅助阅读、划词翻译、渐进式加载和本地缓存。
 - 视频下载、字幕提取、音频转写和基于 transcript 的 AI 报告生成。
+- 自托管短链接、二维码分发、访问统计和多用户链接管理。
 - 本机内存、GPU、软件活跃度和进程热点诊断。
 - 磁盘空间扫描、风险分类、可回收空间分析和安全清理计划。
 - 未来更多围绕 `tok*`、本地日志、HTML 报告、终端效率和开发者运营的开源工具。
@@ -28,6 +29,7 @@ Yao 的开源小工具集合，面向本地优先的 AI 编码、开发者效率
 | [tokscr](tools/tokscr/README.md) | Chrome MV3 扩展 | 浏览器插件 | 网页截图工具，支持完整页面、可见区域、选择区域、主体去噪、预览页二次裁剪和 PNG/JPEG/PDF/复制/打印导出。 |
 | [toktra](tools/toktra/README.md) | Chrome MV3 扩展 | 浏览器插件 | 网页和 PDF 英译中阅读插件，支持手动/站点/全局翻译模式、划词翻译、缓存、PDF 双栏阅读和本地 API 配置。 |
 | [TokDoc](tools/TokDoc/README.md) | Node.js / Docker 本地工作台 | `npm run dev` / Docker | 本地文档管理器，支持上传 HTML/PDF/Word、目录监听、生成公开短链接、HTML 页面内编辑、回收站、访问统计和线上同步。 |
+| [TokURL](tools/tokurl/README.md) | Node.js / Docker 自托管 Web App | Docker Compose | 短链接系统，支持极短 slug、二维码、访问统计、用户管理、站点设置和本地多容器部署。 |
 | [vidbrief](tools/vidbrief/README.md) | Python CLI/TUI | `vb` | 视频下载、字幕或音频转写、Transcript 整理和 AI 报告生成。 |
 | [mem](tools/mem/README.md) | Python CLI/TUI | `mem` | 本机内存、GPU、软件活跃度和进程明细诊断。 |
 | [Scai](tools/yao-scai-cli/README.md) | Python CLI/TUI | `scai` | AI-native 磁盘空间扫描与清理建议工具，用于找大文件、分析风险和生成释放空间方案。 |
@@ -143,6 +145,37 @@ http://127.0.0.1:8080/admin      # Node 本机运行
 http://127.0.0.1:18082/admin     # Docker 运行
 ```
 
+### TokURL
+
+TokURL 是一个可自托管的短链接系统，适合把长链接转换成短 slug，并提供二维码分享、访问统计、链接二次编辑、用户管理和站点 SEO/统计代码设置。
+
+它采用 Fastify、React、Postgres、Redis 和 Docker Compose 组合。Redirect 路径优先读取 Redis 缓存，点击事件通过 Redis Stream 异步写入，避免把统计写入阻塞在跳转链路里。
+
+主要能力包括：
+
+- 首页公开可访问，未登录用户创建短链时可弹出极简注册/登录。
+- 普通用户只能管理自己的短链，默认每日创建额度为 5 条。
+- 超级管理员可管理所有用户、链接和全站设置。
+- 支持真实二维码生成、短链复制、链接编辑、标题抓取、分页管理和全部 URL 统计。
+- 支持 Docker Compose 本地多容器部署，包含 Web、API、worker、Postgres 和 Redis。
+
+快速开始：
+
+```bash
+cd yao-open-tools/tools/tokurl
+cp .env.example .env
+docker compose up --build
+```
+
+默认访问：
+
+```text
+http://localhost:3000      # Web 控制台
+http://localhost:8080/:id  # 短链跳转入口
+```
+
+生产部署说明见 `tools/tokurl/docs/server-deployment.md`。
+
 ### vidbrief
 
 `vidbrief` 提供 `vb` 命令，用于把在线视频或本地媒体转成可阅读、可归档、可继续交给 AI 处理的资料包。
@@ -237,6 +270,7 @@ yao-open-tools/
     tokscr/
     toktra/
     TokDoc/
+    tokurl/
     vidbrief/
     mem/
     yao-scai-cli/
@@ -264,7 +298,7 @@ cd yao-open-tools
 ls tools
 ```
 
-如果你只想看 AI 编码使用量，从 `tools/tokkit` 开始。如果你想截图网页，从 `tools/tokscr` 开始。如果你想翻译英文网页或 PDF，从 `tools/toktra` 开始。如果你想管理 HTML/PDF/Word 文档并在线编辑 HTML 页面，从 `tools/TokDoc` 开始。如果你想处理视频 transcript，从 `tools/vidbrief` 开始。如果你想诊断本机内存，从 `tools/mem` 开始。如果你想找磁盘空间占用，从 `tools/yao-scai-cli` 开始。
+如果你只想看 AI 编码使用量，从 `tools/tokkit` 开始。如果你想截图网页，从 `tools/tokscr` 开始。如果你想翻译英文网页或 PDF，从 `tools/toktra` 开始。如果你想管理 HTML/PDF/Word 文档并在线编辑 HTML 页面，从 `tools/TokDoc` 开始。如果你想部署短链接服务，从 `tools/tokurl` 开始。如果你想处理视频 transcript，从 `tools/vidbrief` 开始。如果你想诊断本机内存，从 `tools/mem` 开始。如果你想找磁盘空间占用，从 `tools/yao-scai-cli` 开始。
 
 ## 后续方向
 

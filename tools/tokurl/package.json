@@ -1,0 +1,21 @@
+{
+  "name": "tokurl",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TokURL is a fast, self-hostable short link service with analytics.",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:api": "npm run dev --workspace @tokurl/api",
+    "dev:worker": "npm run dev:worker --workspace @tokurl/api",
+    "dev:web": "npm run dev --workspace @tokurl/web",
+    "db:migrate": "npm run db:migrate --workspace @tokurl/api"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

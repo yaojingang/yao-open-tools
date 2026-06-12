@@ -1,0 +1,107 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tokurl}
+      POSTGRES_USER: ${POSTGRES_USER:-tokurl}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tokurl}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tokurl} -d ${POSTGRES_DB:-tokurl}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    command: ["sh", "-c", "node apps/api/dist/db/migrate.js && node apps/api/dist/server.js"]
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 8080
+      DATABASE_URL: ${DATABASE_URL:-postgres://tokurl:tokurl@postgres:5432/tokurl}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      PUBLIC_SHORT_BASE_URL: ${PUBLIC_SHORT_BASE_URL:-http://localhost:8080}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      TOKURL_SLUG_LENGTH: ${TOKURL_SLUG_LENGTH:-5}
+      TOKURL_REDIRECT_STATUS: ${TOKURL_REDIRECT_STATUS:-302}
+      TOKURL_CACHE_TTL_SECONDS: ${TOKURL_CACHE_TTL_SECONDS:-300}
+      TOKURL_AUTH_SECRET: ${TOKURL_AUTH_SECRET:-change-this-auth-secret-before-production}
+      TOKURL_BOOTSTRAP_ADMIN_EMAIL: ${TOKURL_BOOTSTRAP_ADMIN_EMAIL:-admin@tokurl.local}
+      TOKURL_BOOTSTRAP_ADMIN_PASSWORD: ${TOKURL_BOOTSTRAP_ADMIN_PASSWORD:-tokurl-admin}
+      TOKURL_ALLOW_REGISTRATION: ${TOKURL_ALLOW_REGISTRATION:-true}
+      TOKURL_COOKIE_SECURE: ${TOKURL_COOKIE_SECURE:-false}
+      TOKURL_TITLE_FETCH_TIMEOUT_MS: ${TOKURL_TITLE_FETCH_TIMEOUT_MS:-1200}
+      TOKURL_TITLE_FETCH_MAX_BYTES: ${TOKURL_TITLE_FETCH_MAX_BYTES:-131072}
+      TOKURL_TITLE_FETCH_ALLOW_PRIVATE_HOSTS: ${TOKURL_TITLE_FETCH_ALLOW_PRIVATE_HOSTS:-false}
+      TOKURL_ADMIN_TOKEN: ${TOKURL_ADMIN_TOKEN:-}
+      TOKURL_HASH_SALT: ${TOKURL_HASH_SALT:-change-this-before-production}
+      TOKURL_ANALYTICS_ENABLED: ${TOKURL_ANALYTICS_ENABLED:-true}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    command: ["node", "apps/api/dist/worker.js"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:-postgres://tokurl:tokurl@postgres:5432/tokurl}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      TOKURL_HASH_SALT: ${TOKURL_HASH_SALT:-change-this-before-production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+    ports:
+      - "${WEB_PORT:-3000}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:

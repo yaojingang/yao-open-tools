@@ -12,6 +12,7 @@
 | [`tokscr/`](tokscr/README.md) | Chrome 扩展 | Browser Extension | Chrome MV3 网页截图工具，支持完整页面、可见区域、选择区域、主体去噪、预览页二次裁剪和多格式导出。 |
 | [`toktra/`](toktra/README.md) | Chrome 扩展 | Browser Extension | Chrome MV3 网页/PDF 英译中阅读插件，支持手动/自动翻译模式、划词翻译、本地缓存和 OpenAI-compatible API。 |
 | [`TokDoc/`](TokDoc/README.md) | `npm run dev` / Docker | Node.js Local Web App | 本地文档管理器，支持上传 HTML/PDF/Word、目录监听、生成公开短链接、HTML 页面内编辑、回收站、访问统计和线上同步。 |
+| [`tokurl/`](tokurl/README.md) | Docker Compose | Node.js / Docker Web App | 自托管短链接系统，支持二维码、访问统计、用户管理、站点设置和本地多容器部署。 |
 | [`vidbrief/`](vidbrief/README.md) | `vb` | Python CLI/TUI | 视频下载、字幕提取、音频转写和 AI Markdown 报告生成。 |
 | [`mem/`](mem/README.md) | `mem` | Python CLI/TUI | 本机内存、GPU、软件活跃度和进程热点诊断。 |
 | [`yao-scai-cli/`](yao-scai-cli/README.md) | `scai` | Python CLI/TUI | 磁盘空间扫描、风险分类和安全清理建议。 |

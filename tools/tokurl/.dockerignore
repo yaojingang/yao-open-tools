@@ -1,0 +1,9 @@
+node_modules
+apps/*/dist
+.git
+.env
+.DS_Store
+coverage
+test-results
+tmp
+*.log
