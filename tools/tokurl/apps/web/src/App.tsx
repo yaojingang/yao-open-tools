@@ -12,6 +12,7 @@ import {
   Edit3,
   ExternalLink,
   FileText,
+  Github,
   Globe2,
   KeyRound,
   Languages,
@@ -70,6 +71,7 @@ type SettingsTab = "site" | "domain" | "api" | "webhook" | "deploy";
 type AuthMode = "login" | "register";
 
 const AUTHOR_PROFILE_URL = "https://x.com/yaojingang";
+const GITHUB_REPOSITORY_URL = "https://github.com/yaojingang/yao-open-tools/tree/main/tools/tokurl";
 const ANALYTICS_ALL_VALUE = "all";
 const LINKS_PAGE_SIZE = 10;
 const SITE_ANALYTICS_NODE_ATTRIBUTE = "data-tokurl-site-analytics";
@@ -1541,7 +1543,8 @@ export default function App() {
               <input
                 className="url-input"
                 required
-                type="url"
+                type="text"
+                inputMode="url"
                 value={createForm.targetUrl}
                 onChange={(event) => setCreateForm((form) => ({ ...form, targetUrl: event.target.value }))}
                 placeholder={t.destinationPlaceholder}
@@ -1676,10 +1679,16 @@ export default function App() {
 
         <footer className="home-footer">
           <span>{t.footerCopyright(copyrightYear, brandName)}</span>
-          <a href={AUTHOR_PROFILE_URL} target="_blank" rel="noreferrer">
-            {t.footerAuthor}
-            <ExternalLink size={13} />
-          </a>
+          <div className="home-footer-links">
+            <a href={GITHUB_REPOSITORY_URL} target="_blank" rel="noreferrer">
+              <Github size={14} />
+              {t.footerGithub}
+            </a>
+            <a href={AUTHOR_PROFILE_URL} target="_blank" rel="noreferrer">
+              {t.footerAuthor}
+              <ExternalLink size={13} />
+            </a>
+          </div>
         </footer>
       </section>
     );
@@ -2724,7 +2733,8 @@ docker compose up --build`;
                 <span>{t.destinationUrl}</span>
                 <input
                   required
-                  type="url"
+                  type="text"
+                  inputMode="url"
                   value={editForm.targetUrl}
                   onChange={(event) => setEditForm((form) => ({ ...form, targetUrl: event.target.value }))}
                 />

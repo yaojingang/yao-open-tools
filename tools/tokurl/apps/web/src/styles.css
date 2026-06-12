@@ -869,6 +869,14 @@ p {
   font-size: 12px;
 }
 
+.home-footer-links {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
 .home-footer a {
   display: inline-flex;
   align-items: center;
@@ -2359,6 +2367,11 @@ tbody tr.selected-row {
     align-items: flex-start;
     flex-direction: column;
     margin-top: 36px;
+  }
+
+  .home-footer-links {
+    justify-content: flex-start;
+    gap: 14px;
   }
 
   .advanced-fields .wide {
