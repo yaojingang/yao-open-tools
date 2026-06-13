@@ -2195,12 +2195,14 @@ tbody tr.selected-row {
 
 @media (max-width: 720px) {
   .modal-mask {
+    min-height: 100dvh;
     padding: 16px;
   }
 
   .modal,
   .link-edit-modal {
     width: min(100%, calc(100vw - 32px));
+    max-height: calc(100dvh - 32px);
   }
 
   .modal-share-panel {
@@ -2217,33 +2219,33 @@ tbody tr.selected-row {
     max-width: 1080px;
   }
 
+  .guest-nav-links,
+  .nav-refresh-btn {
+    display: none;
+  }
+
+  .nav-right {
+    margin-left: auto;
+  }
+
   .auth-topbar {
     width: calc(100% - 32px);
   }
 
   .auth-page {
-    min-height: calc(100vh - 64px);
-    padding: 18px 20px 56px;
+    align-items: start;
+    min-height: calc(100dvh - 64px);
+    padding: 18px 20px 48px;
   }
 
   .auth-shell {
     grid-template-columns: 1fr;
-    gap: 24px;
+    gap: 18px;
     width: 100%;
   }
 
   .auth-brand {
-    justify-items: center;
-    text-align: center;
-  }
-
-  .auth-brand strong {
-    font-size: 34px;
-  }
-
-  .auth-brand p {
-    max-width: 320px;
-    font-size: 14px;
+    display: none;
   }
 
   .auth-card {
@@ -2413,6 +2415,12 @@ tbody tr.selected-row {
     grid-template-columns: 1fr;
   }
 
+  .kpi strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .create-card,
   .result-card,
   .chart-card,
@@ -2553,8 +2561,12 @@ tbody tr.selected-row {
     width: 100%;
   }
 
+  .links-table th:nth-child(n),
+  .links-table td:nth-child(n),
   .users-table th:nth-child(n),
-  .users-table td:nth-child(n) {
+  .users-table td:nth-child(n),
+  .users-table.with-selection th:nth-child(n),
+  .users-table.with-selection td:nth-child(n) {
     width: 100%;
   }
 

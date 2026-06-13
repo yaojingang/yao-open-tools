@@ -590,6 +590,10 @@ export default function App() {
   const currentUser = meQuery.isError ? null : (meQuery.data?.user ?? null);
   const isAdmin = currentUser?.role === "admin";
 
+  useEffect(() => {
+    document.querySelector(".nav-links a.active")?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [view, currentUser, isAdmin]);
+
   const linksQuery = useQuery({
     queryKey: ["links", token, search, statusFilter, linksPage],
     queryFn: () =>
@@ -2884,7 +2888,7 @@ docker compose up --build`;
             <strong>{brandName}</strong>
           </a>
 
-          <nav className="nav-links" aria-label={t.primaryNav}>
+          <nav className={`nav-links ${currentUser ? "" : "guest-nav-links"}`} aria-label={t.primaryNav}>
             {navItems.filter((item) => (currentUser ? item.id !== "settings" || isAdmin : item.id === "create")).map((item) => {
               const Icon = item.icon;
               return (
@@ -2932,7 +2936,7 @@ docker compose up --build`;
               <Languages size={16} />
               <span>{t.languageToggle}</span>
             </button>
-            <button className="icon-btn" type="button" title={t.refresh} onClick={() => void queryClient.invalidateQueries()}>
+            <button className="icon-btn nav-refresh-btn" type="button" title={t.refresh} onClick={() => void queryClient.invalidateQueries()}>
               <RefreshCw size={16} />
             </button>
             {currentUser ? (
