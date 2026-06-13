@@ -81,7 +81,9 @@ VITE_API_BASE_URL=https://ai.laoyao.cn/api
 - `/{slug}` 这种短码路径转发到 API。
 - 其它路径回到 Web，让前端伪静态路由正常工作。
 
-下面是 Nginx 示例。把证书路径改成你服务器上的真实路径。
+如果公网 Nginx、宝塔、1Panel 或云厂商网关把 `https://ai.laoyao.cn/*` 全部转发到 Web 容器，旧版 Web 容器会把 `/LBQyb` 这类路径回退到前端 `index.html`，短链就不会跳转。现在 Web 容器内置 Nginx 已经增加了 `/api/` 和 `/{slug}` 到 API 容器的反代，公网入口可以直接指向 Web 容器。
+
+如果你希望公网 Nginx 直接分别转发到 Web 和 API 两个端口，也可以使用下面的 Nginx 示例。把证书路径改成你服务器上的真实路径。
 
 ```nginx
 upstream tokurl_web {
@@ -161,7 +163,7 @@ server {
   }
 
   # 短链跳转。TokURL 的短码支持 2 到 64 位，字符为数字、字母、下划线和短横线。
-  location ~ ^/[0-9A-Za-z_-]{2,64}$ {
+  location ~ "^/[0-9A-Za-z_-]{2,64}$" {
     proxy_pass http://tokurl_api;
   }
 
@@ -185,6 +187,20 @@ systemctl reload nginx
 - `/assets/`、`/links`、`/analytics`、`/users`、`/settings` 指向 `127.0.0.1:3000`。
 - 短码路径指向 `127.0.0.1:8080`。
 - 其它路径指向 `127.0.0.1:3000`。
+
+如果你的公网入口只支持配置一个上游，推荐直接指向 Web 容器端口：
+
+```text
+https://ai.laoyao.cn/* -> 127.0.0.1:3000
+```
+
+Web 容器会继续做二次分流：
+
+```text
+/api/*                  -> api:8080
+/{2-64位短码}            -> api:8080
+/, /links, /settings 等 -> Web 静态前端
+```
 
 ## 4. 重新构建和启动
 
@@ -349,7 +365,7 @@ location ^~ /api/ {
 说明 `/{slug}` 没有转发到 API。检查 Nginx 里是否有这段：
 
 ```nginx
-location ~ ^/[0-9A-Za-z_-]{2,64}$ {
+location ~ "^/[0-9A-Za-z_-]{2,64}$" {
   proxy_pass http://tokurl_api;
 }
 ```

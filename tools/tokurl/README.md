@@ -37,7 +37,7 @@ The first startup bootstraps a super admin:
 
 Change these values with environment variables before exposing a production deployment.
 
-Short links resolve from `http://localhost:8080/{slug}` by default. Change `PUBLIC_SHORT_BASE_URL` when running behind a real domain.
+Short links resolve from `http://localhost:8080/{slug}` by default. Change `PUBLIC_SHORT_BASE_URL` when running behind a real domain. For a single-domain setup such as `https://ai.laoyao.cn/{slug}`, the public gateway must route `/api/*` and root short-code paths to the API. The packaged Web container already proxies those paths to the API when all traffic is sent to the Web container.
 
 For production server setup, see [docs/server-deployment.md](docs/server-deployment.md).
 

@@ -4,14 +4,14 @@
 
 ## 1. 推荐架构
 
-TokURL 建议使用两个域名：
+TokURL 默认推荐使用两个域名，规则最简单：
 
 | 用途 | 示例域名 | 指向服务 |
 | --- | --- | --- |
 | 管理后台 | `https://app.example.com` | `web` |
 | API 与短链跳转 | `https://s.example.com` | `api` |
 
-不要把管理后台和短链跳转都放在同一个根域名下。原因是 API 使用 `/:slug` 处理短链跳转，而前端也有 `/links`、`/users`、`/settings` 等伪静态路由。两个域名最清晰，也最适合后续开源部署。
+单域名也受支持，例如 `https://ai.laoyao.cn` 同时承载前端、API 和短链。关键是入口路由必须分流：`/api/*` 和 `/{slug}` 进 API，`/`、`/links`、`/analytics`、`/users`、`/settings` 进 Web。当前 Web 容器内置 Nginx 已经支持这套分流，所以公网入口也可以只指向 Web 容器。完整配置见 [single-domain-ai-laoyao-deployment.md](single-domain-ai-laoyao-deployment.md)。
 
 访问流向：
 
@@ -30,7 +30,7 @@ TokURL 建议使用两个域名：
 - 2 GB 内存
 - 20 GB 以上磁盘
 - 已安装 Docker 与 Docker Compose
-- 已解析两个域名到服务器公网 IP
+- 已解析一个或两个域名到服务器公网 IP
 
 生产环境只需要对外开放 `80`、`443`。Postgres、Redis、API、Web 的容器端口建议只绑定到本机，由反向代理转发访问。
 
