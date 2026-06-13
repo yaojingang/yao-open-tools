@@ -2284,10 +2284,6 @@ tbody tr.selected-row {
 
   .create-page {
     padding-top: 44px;
-    width: 350px;
-    max-width: calc(100vw - 40px);
-    margin-right: 20px;
-    margin-left: 20px;
   }
 
   .prototype-hero h1 {
