@@ -559,6 +559,10 @@ export default function App() {
   }, [configQuery.data?.siteSettings]);
 
   useEffect(() => {
+    setNamedMeta("robots", view === "create" ? "index,follow" : "noindex,nofollow");
+  }, [view]);
+
+  useEffect(() => {
     injectSiteAnalyticsCode(configQuery.data?.siteSettings.analyticsCode ?? "");
     return () => removeSiteAnalyticsCode();
   }, [configQuery.data?.siteSettings.analyticsCode]);
