@@ -42,6 +42,9 @@ switch ($action) {
     case 'current_user':
         handleCurrentUser();
         break;
+    case 'update_profile':
+        handleUpdateProfile();
+        break;
     case 'check_remember':
         handleCheckRemember();
         break;
@@ -236,4 +239,35 @@ function handleCurrentUser() {
     }
 
     jsonSuccess(['user' => $user]);
+}
+
+/**
+ * 更新当前前台用户资料
+ */
+function handleUpdateProfile() {
+    if (!isset($_SESSION['user_id'])) {
+        jsonError('未登录', 401);
+    }
+
+    $input = getJsonInput();
+    $name = trim((string)($input['name'] ?? ''));
+
+    if ($name === '') {
+        jsonError('显示名称不能为空');
+    }
+    if (mb_strlen($name) > 30) {
+        jsonError('显示名称不能超过30个字符');
+    }
+
+    $db = getDB();
+    $stmt = $db->prepare("UPDATE users SET name = ? WHERE id = ?");
+    $stmt->execute([$name, $_SESSION['user_id']]);
+
+    $_SESSION['user_name'] = $name;
+
+    $stmt = $db->prepare("SELECT id, name, role, phone, avatar, email FROM users WHERE id = ?");
+    $stmt->execute([$_SESSION['user_id']]);
+    $user = $stmt->fetch();
+
+    jsonSuccess(['user' => $user], '资料已更新');
 }

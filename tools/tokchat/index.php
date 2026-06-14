@@ -423,16 +423,18 @@ function esc($value) {
             <!-- 动态加载历史记录 -->
         </div>
 
-        <!-- 用户信息 -->
+        <!-- 个人中心入口 -->
         <div class="p-4 border-t border-slate-100 bg-slate-50/50">
             <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold shadow-sm">
-                    <?php echo mb_substr($currentUser['name'], 0, 1); ?>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-bold text-slate-700 truncate"><?php echo htmlspecialchars($currentUser['name']); ?></p>
-                    <p class="text-xs text-slate-500 truncate"><?php echo htmlspecialchars($currentUser['phone'] ?? ''); ?></p>
-                </div>
+                <button onclick="openProfileModal()" class="flex-1 min-w-0 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left shadow-sm hover:border-blue-300 hover:bg-blue-50/40 transition" title="个人中心">
+                    <span class="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm shadow-sm">
+                        <i class="fas fa-user"></i>
+                    </span>
+                    <span class="min-w-0">
+                        <span class="block text-sm font-bold text-slate-700">个人中心</span>
+                        <span class="block text-xs text-slate-400 truncate">账户资料与显示名称</span>
+                    </span>
+                </button>
                 <button onclick="logout()" class="text-slate-400 hover:text-red-500 transition" title="退出登录">
                     <i class="fas fa-sign-out-alt"></i>
                 </button>
@@ -440,6 +442,43 @@ function esc($value) {
             <p class="text-[10px] leading-relaxed text-slate-400 mt-3 line-clamp-2"><?php echo esc($siteSettings['copyright_text']); ?></p>
         </div>
     </aside>
+
+    <!-- 个人中心弹窗 -->
+    <div id="profile-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/45 px-4">
+        <div class="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div class="flex items-center gap-3 border-b border-slate-100 px-6 py-5">
+                <div class="flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                    <i class="fas fa-user-circle text-xl"></i>
+                </div>
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900">个人中心</h2>
+                    <p class="text-sm text-slate-500">查看账号信息，修改前台显示名称</p>
+                </div>
+            </div>
+            <div class="space-y-4 px-6 py-5">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">显示名称</label>
+                    <input id="profile-name-input" type="text" maxlength="30" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-100" placeholder="请输入显示名称">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">手机号</label>
+                    <input id="profile-phone-input" type="text" readonly class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-500" value="">
+                    <p class="mt-1 text-xs text-slate-400">手机号用于登录，如需修改请联系系统管理员。</p>
+                </div>
+                <div id="profile-error" class="hidden rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-600"></div>
+                <div id="profile-success" class="hidden rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-700"></div>
+            </div>
+            <div class="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-6 py-4">
+                <button onclick="logout()" class="text-sm font-medium text-slate-500 hover:text-red-600">
+                    <i class="fas fa-sign-out-alt mr-1"></i> 退出登录
+                </button>
+                <div class="flex gap-2">
+                    <button onclick="closeProfileModal()" class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">取消</button>
+                    <button id="profile-save-button" onclick="saveProfile()" class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- 中间栏：核心对话区 -->
     <main class="flex-1 flex flex-col min-h-0 relative bg-slate-50/30 w-full md:w-auto overflow-hidden">
@@ -598,6 +637,89 @@ function esc($value) {
                 await fetch(`${API_BASE}/auth.php?action=logout`);
             } catch(e) {}
             window.location.href = 'login.php';
+        }
+
+        function setProfileNotice(type, message) {
+            const errorEl = document.getElementById('profile-error');
+            const successEl = document.getElementById('profile-success');
+            errorEl.classList.add('hidden');
+            successEl.classList.add('hidden');
+            if (!message) return;
+
+            const target = type === 'success' ? successEl : errorEl;
+            target.textContent = message;
+            target.classList.remove('hidden');
+        }
+
+        async function openProfileModal() {
+            const modal = document.getElementById('profile-modal');
+            const nameInput = document.getElementById('profile-name-input');
+            const phoneInput = document.getElementById('profile-phone-input');
+            setProfileNotice('', '');
+            nameInput.value = CURRENT_USER.name || '';
+            phoneInput.value = CURRENT_USER.phone || '';
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => nameInput.focus(), 50);
+
+            try {
+                const response = await fetch(`${API_BASE}/auth.php?action=current_user`);
+                const data = await response.json();
+                if (data.success && data.data?.user) {
+                    Object.assign(CURRENT_USER, data.data.user);
+                    nameInput.value = CURRENT_USER.name || '';
+                    phoneInput.value = CURRENT_USER.phone || '';
+                }
+            } catch (error) {
+                console.error('Load profile error:', error);
+            }
+        }
+
+        function closeProfileModal() {
+            const modal = document.getElementById('profile-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            setProfileNotice('', '');
+        }
+
+        async function saveProfile() {
+            const button = document.getElementById('profile-save-button');
+            const nameInput = document.getElementById('profile-name-input');
+            const name = nameInput.value.trim();
+
+            if (!name) {
+                setProfileNotice('error', '显示名称不能为空');
+                nameInput.focus();
+                return;
+            }
+
+            button.disabled = true;
+            button.textContent = '保存中...';
+            setProfileNotice('', '');
+            try {
+                const response = await fetch(`${API_BASE}/auth.php?action=update_profile`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.error || '保存失败');
+                }
+                if (data.data?.user) {
+                    Object.assign(CURRENT_USER, data.data.user);
+                } else {
+                    CURRENT_USER.name = name;
+                }
+                setProfileNotice('success', '显示名称已更新');
+                generateGreeting();
+                setTimeout(closeProfileModal, 500);
+            } catch (error) {
+                setProfileNotice('error', error.message || '保存失败');
+            } finally {
+                button.disabled = false;
+                button.textContent = '保存';
+            }
         }
 
         // 切换模式
@@ -2089,6 +2211,12 @@ function esc($value) {
             loadHotSearches();
             loadSkillLearning();
             loadKnowledgeVersion();
+
+            document.getElementById('profile-modal')?.addEventListener('click', (event) => {
+                if (event.target.id === 'profile-modal') {
+                    closeProfileModal();
+                }
+            });
         });
 
         // 全局键盘快捷键
@@ -2108,6 +2236,8 @@ function esc($value) {
                     setTimeout(() => {
                         toast.remove();
                     }, 2000);
+                } else if (e.key === 'Escape' && !document.getElementById('profile-modal')?.classList.contains('hidden')) {
+                    closeProfileModal();
                 }
             }
         });
