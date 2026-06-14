@@ -54,7 +54,7 @@ function initDatabase() {
         email TEXT,
         phone TEXT UNIQUE,
         password_hash TEXT,
-        role TEXT DEFAULT 'sales_rep',
+        role TEXT DEFAULT 'user',
         status TEXT DEFAULT 'active',
         avatar TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -75,6 +75,8 @@ function initDatabase() {
     } catch (PDOException $e) {
         // 字段已存在，忽略
     }
+
+    normalizeLegacyUserRoles($db);
 
     // 检查并添加 company 字段（公司简称）
     try {
@@ -421,8 +423,8 @@ function insertDefaultData($db) {
     if ($result['count'] == 0 && SEED_DEMO_USERS) {
         // 插入可选演示前台用户（手机号登录）。默认不初始化，避免公开部署携带本地数据。
         $db->exec("INSERT INTO users (name, email, phone, role, status, avatar) VALUES
-            ('演示用户一', 'demo1@example.com', '19900000001', 'sales_rep', 'active', 'https://ui-avatars.com/api/?name=Demo+User+1&background=0D8ABC&color=fff'),
-            ('演示用户二', 'demo2@example.com', '19900000002', 'sales_rep', 'active', 'https://ui-avatars.com/api/?name=Demo+User+2&background=7e22ce&color=fff')
+            ('演示用户一', 'demo1@example.com', '19900000001', 'user', 'active', 'https://ui-avatars.com/api/?name=Demo+User+1&background=0D8ABC&color=fff'),
+            ('演示用户二', 'demo2@example.com', '19900000002', 'user', 'active', 'https://ui-avatars.com/api/?name=Demo+User+2&background=7e22ce&color=fff')
         ");
     }
 
@@ -439,6 +441,10 @@ function insertDefaultData($db) {
 
     insertDefaultSiteSettings($db);
     insertDefaultAIAPIConfigs($db);
+}
+
+function normalizeLegacyUserRoles($db) {
+    $db->exec("UPDATE users SET role = 'user' WHERE role IN ('sales_rep', 'sales_manager') OR role IS NULL OR TRIM(role) = ''");
 }
 
 /**

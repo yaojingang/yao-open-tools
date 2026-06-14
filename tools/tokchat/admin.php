@@ -311,7 +311,7 @@ function esc($value) {
                                     </td>
                                     <td class="px-6 py-4">
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border"
-                                              :class="user.role === 'admin' ? 'bg-purple-50 text-purple-700 border-purple-100' : (user.role === 'sales_manager' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-gray-50 text-gray-700 border-gray-100')"
+                                              :class="normalizeUserRole(user.role) === 'admin' ? 'bg-purple-50 text-purple-700 border-purple-100' : 'bg-gray-50 text-gray-700 border-gray-100'"
                                               x-text="formatRole(user.role)"></span>
                                     </td>
                                     <td class="px-6 py-4">
@@ -1548,8 +1548,7 @@ function esc($value) {
                         <div>
                             <label class="block text-sm font-medium text-gray-700">角色权限</label>
                             <select x-model="userForm.role" class="mt-1 block w-full border-gray-300 rounded-lg py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm">
-                                <option value="sales_rep">销售代表</option>
-                                <option value="sales_manager">销售经理</option>
+                                <option value="user">普通用户</option>
                                 <option value="admin">系统管理员</option>
                             </select>
                         </div>
@@ -2131,7 +2130,7 @@ function esc($value) {
                     enabled_apis: []
                 },
 
-                userForm: { name: '', company: '', phone: '', email: '', role: 'sales_rep' },
+                userForm: { name: '', company: '', phone: '', email: '', role: 'user' },
                 adminForm: { username: '', password: '', name: '', role: 'admin' },
                 isAdminModalOpen: false,
                 editingAdmin: null,
@@ -2775,13 +2774,19 @@ function esc($value) {
 
                 openUserModal() {
                     this.editingUser = null;
-                    this.userForm = { name: '', company: '', phone: '', email: '', role: 'sales_rep' };
+                    this.userForm = { name: '', company: '', phone: '', email: '', role: 'user' };
                     this.isUserModalOpen = true;
                 },
 
                 editUser(user) {
                     this.editingUser = user;
-                    this.userForm = { name: user.name, company: user.company || '', phone: user.phone || '', email: user.email || '', role: user.role };
+                    this.userForm = {
+                        name: user.name,
+                        company: user.company || '',
+                        phone: user.phone || '',
+                        email: user.email || '',
+                        role: this.normalizeUserRole(user.role)
+                    };
                     this.isUserModalOpen = true;
                 },
 
@@ -3774,8 +3779,14 @@ function esc($value) {
                 },
 
                 formatRole(role) {
-                    const roles = { 'super_admin': '超级管理员', 'admin': '管理员', 'sales_manager': '销售经理', 'sales_rep': '销售代表' };
-                    return roles[role] || role;
+                    const normalizedRole = this.normalizeUserRole(role);
+                    const roles = { 'super_admin': '超级管理员', 'admin': '系统管理员', 'user': '普通用户' };
+                    return roles[normalizedRole] || role;
+                },
+
+                normalizeUserRole(role) {
+                    if (role === 'admin' || role === 'super_admin') return role;
+                    return 'user';
                 },
 
                 apiStatsStatusClass(status) {
