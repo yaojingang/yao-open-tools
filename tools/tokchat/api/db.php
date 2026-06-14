@@ -583,9 +583,15 @@ function insertDefaultAIAPIConfigs($db) {
         $stmt->execute([$key, $value]);
     }
 
+    cleanupLegacySeededAPIConfigs($db);
+
     $stmt = $db->query("SELECT COUNT(*) as count FROM ai_api_configs");
     $result = $stmt->fetch();
     if ((int)$result['count'] > 0) {
+        return;
+    }
+
+    if (!SEED_DEFAULT_API_CONFIGS) {
         return;
     }
 
@@ -594,33 +600,43 @@ function insertDefaultAIAPIConfigs($db) {
         timeout_seconds, connect_timeout_seconds, max_tokens, temperature
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    $stmt->execute([
-        '主API',
-        TUZI_API_URL,
-        TUZI_API_KEY,
-        TUZI_MODEL,
-        'messages',
-        'active',
-        10,
-        API_TOTAL_TIMEOUT,
-        API_CONNECT_TIMEOUT,
-        API_MAX_TOKENS,
-        API_TEMPERATURE
-    ]);
+    $defaultAPIs = [
+        ['主API', TUZI_API_URL, TUZI_API_KEY, TUZI_MODEL, 'messages', 10],
+        ['备用API', TUZI_BACKUP_API_URL, TUZI_BACKUP_API_KEY, TUZI_BACKUP_MODEL, 'chat_completions', 20],
+    ];
 
-    $stmt->execute([
-        '备用API',
-        TUZI_BACKUP_API_URL,
-        TUZI_BACKUP_API_KEY,
-        TUZI_BACKUP_MODEL,
-        'chat_completions',
-        'active',
-        20,
-        API_TOTAL_TIMEOUT,
-        API_CONNECT_TIMEOUT,
-        API_MAX_TOKENS,
-        API_TEMPERATURE
-    ]);
+    foreach ($defaultAPIs as [$name, $url, $key, $model, $type, $priority]) {
+        if (trim($url) === '' || trim($key) === '' || trim($model) === '') {
+            continue;
+        }
+
+        $stmt->execute([
+            $name,
+            $url,
+            $key,
+            $model,
+            $type,
+            'active',
+            $priority,
+            API_TOTAL_TIMEOUT,
+            API_CONNECT_TIMEOUT,
+            API_MAX_TOKENS,
+            API_TEMPERATURE
+        ]);
+    }
+}
+
+/**
+ * 清理早期版本无条件初始化的默认 API。只移除空 key 的历史种子记录，
+ * 避免误删管理员已经填写过密钥的配置。
+ */
+function cleanupLegacySeededAPIConfigs($db) {
+    $stmt = $db->prepare("DELETE FROM ai_api_configs
+        WHERE name IN ('主API', '备用API')
+          AND api_type IN ('messages', 'chat_completions')
+          AND priority IN (10, 20)
+          AND TRIM(COALESCE(api_key, '')) = ''");
+    $stmt->execute();
 }
 
 /**

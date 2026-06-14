@@ -65,6 +65,10 @@ class AIManager {
             }
         }
 
+        if (empty($errors)) {
+            throw new Exception("未配置可用 API。请先在后台「API 配置」页面添加模型 API。");
+        }
+
         throw new Exception("所有API都失败了。" . implode(' | ', $errors));
     }
 
@@ -470,7 +474,7 @@ class AIManager {
     }
 
     private function getFallbackAPIs() {
-        return [
+        $apis = [
             [
                 'id' => 0,
                 'name' => 'primary',
@@ -496,5 +500,9 @@ class AIManager {
                 'temperature' => $this->config['api_temperature']
             ]
         ];
+
+        return array_values(array_filter($apis, function ($api) {
+            return trim($api['url']) !== '' && trim($api['key']) !== '' && trim($api['model']) !== '';
+        }));
     }
 }
