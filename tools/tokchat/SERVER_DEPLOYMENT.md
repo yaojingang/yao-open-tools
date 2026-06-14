@@ -129,9 +129,12 @@ DEFAULT_ADMIN_NAME=超级管理员
 SEED_DEMO_USERS=0
 ```
 
-API Key 推荐上线后在后台「API 配置」页面维护。也可以先写入 `.env`：
+API Key 推荐上线后在后台「API 配置」页面维护。默认不会初始化任何第三方 API，避免公开部署暴露服务商地址或历史配置。
+
+如需先通过 `.env` 初始化 API，必须填写完整配置并显式开启：
 
 ```env
+SEED_DEFAULT_API_CONFIGS=1
 TUZI_API_URL=https://api.example.com/v1/chat/completions
 TUZI_API_KEY=your-api-key
 TUZI_MODEL=your-model-id

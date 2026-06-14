@@ -50,16 +50,17 @@ define('DEFAULT_ADMIN_USERNAME', envValue('DEFAULT_ADMIN_USERNAME', 'admin'));
 define('DEFAULT_ADMIN_PASSWORD', envValue('DEFAULT_ADMIN_PASSWORD', 'change-me-now'));
 define('DEFAULT_ADMIN_NAME', envValue('DEFAULT_ADMIN_NAME', '超级管理员'));
 define('SEED_DEMO_USERS', envBool('SEED_DEMO_USERS', false));
+define('SEED_DEFAULT_API_CONFIGS', envBool('SEED_DEFAULT_API_CONFIGS', false));
 
-// 兔子API配置 - 主API（更快更稳定的API）
-define('TUZI_API_URL', envValue('TUZI_API_URL', 'https://api.tu-zi.com/v1/messages'));
+// 可选环境变量 API 配置。默认留空，避免公开部署自动暴露第三方服务商地址。
+define('TUZI_API_URL', envValue('TUZI_API_URL', ''));
 define('TUZI_API_KEY', envValue('TUZI_API_KEY', ''));
-define('TUZI_MODEL', envValue('TUZI_MODEL', 'claude-sonnet-4-5-20250929'));
+define('TUZI_MODEL', envValue('TUZI_MODEL', ''));
 
-// 兔子API配置 - 备用API（原主API，响应较慢）
-define('TUZI_BACKUP_API_URL', envValue('TUZI_BACKUP_API_URL', 'https://apicdn.tu-zi.com/v1/chat/completions'));
+// 可选备用 API 配置。推荐上线后在后台「API 配置」页面维护。
+define('TUZI_BACKUP_API_URL', envValue('TUZI_BACKUP_API_URL', ''));
 define('TUZI_BACKUP_API_KEY', envValue('TUZI_BACKUP_API_KEY', ''));
-define('TUZI_BACKUP_MODEL', envValue('TUZI_BACKUP_MODEL', 'claude-sonnet-4-20250514'));
+define('TUZI_BACKUP_MODEL', envValue('TUZI_BACKUP_MODEL', ''));
 
 // API故障转移配置
 define('API_TIMEOUT_THRESHOLD', envInt('API_TIMEOUT_THRESHOLD', 30)); // 超时阈值（秒），超过此时间自动切换到备用API

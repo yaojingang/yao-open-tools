@@ -53,11 +53,19 @@ SEED_DEMO_USERS=0
 
 ## API Key 配置
 
-推荐在后台「API 配置」页面维护 API Key。也可以复制 `.env.docker.example` 为 `.env`，再填写：
+推荐在后台「API 配置」页面维护 API Key。默认不会初始化任何第三方 API，避免公开部署暴露服务商地址或历史配置。
+
+如确实需要通过 `.env` 初始化 API，可复制 `.env.docker.example` 为 `.env` 后填写完整配置，并显式开启：
 
 ```bash
+SEED_DEFAULT_API_CONFIGS=1
+TUZI_API_URL=https://api.example.com/v1/chat/completions
 TUZI_API_KEY=your-primary-key
+TUZI_MODEL=your-model-id
+
+TUZI_BACKUP_API_URL=
 TUZI_BACKUP_API_KEY=your-backup-key
+TUZI_BACKUP_MODEL=
 ```
 
 不要把真实 `.env` 或 API Key 提交到仓库。

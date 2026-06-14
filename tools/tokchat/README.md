@@ -186,16 +186,21 @@ docker compose exec sales-ai php -r "require_once '/var/www/html/api/db.php'; in
 
 ## 🔧 配置说明
 
-### API配置 (api/config.php)
-```php
-// AI API配置
-define('TUZI_API_URL', 'https://apicdn.tu-zi.com/v1/chat/completions');
-define('TUZI_API_KEY', 'your-api-key-here');
-define('TUZI_MODEL', 'claude-sonnet-4-20250514');
+### API 配置
 
-// 文件上传配置
-define('UPLOAD_MAX_SIZE', 10 * 1024 * 1024); // 10MB
-define('UPLOAD_ALLOWED_TYPES', ['pdf', 'md', 'txt', 'docx']);
+推荐在后台「API 配置」页面维护 API。默认不会初始化任何第三方 API，避免公开部署暴露服务商地址或历史配置。
+
+也可以复制 `.env.docker.example` 为 `.env` 后填写完整配置，并显式开启环境变量初始化：
+
+```env
+SEED_DEFAULT_API_CONFIGS=1
+TUZI_API_URL=https://api.example.com/v1/chat/completions
+TUZI_API_KEY=your-api-key
+TUZI_MODEL=your-model-id
+
+TUZI_BACKUP_API_URL=
+TUZI_BACKUP_API_KEY=
+TUZI_BACKUP_MODEL=
 ```
 
 ## 🎨 主要特性
