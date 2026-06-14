@@ -1,0 +1,47 @@
+name: sales-ai-assistant
+
+services:
+  sales-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sales-ai-assistant:local
+    container_name: sales-ai-assistant
+    restart: unless-stopped
+    ports:
+      - "${SALES_AI_HTTP_PORT:-18084}:8080"
+    environment:
+      APP_DEBUG: "${APP_DEBUG:-0}"
+      PHP_MEMORY_LIMIT: "${PHP_MEMORY_LIMIT:-256M}"
+      PHP_MAX_EXECUTION_TIME: "${PHP_MAX_EXECUTION_TIME:-300}"
+      PHP_MAX_INPUT_TIME: "${PHP_MAX_INPUT_TIME:-300}"
+      PHP_UPLOAD_MAX_FILESIZE: "${PHP_UPLOAD_MAX_FILESIZE:-20M}"
+      PHP_POST_MAX_SIZE: "${PHP_POST_MAX_SIZE:-24M}"
+      TZ: "${TZ:-Asia/Shanghai}"
+      DEFAULT_ADMIN_USERNAME: "${DEFAULT_ADMIN_USERNAME:-admin}"
+      DEFAULT_ADMIN_PASSWORD: "${DEFAULT_ADMIN_PASSWORD:-change-me-now}"
+      DEFAULT_ADMIN_NAME: "${DEFAULT_ADMIN_NAME:-超级管理员}"
+      SEED_DEMO_USERS: "${SEED_DEMO_USERS:-0}"
+      SALES_AI_HOST: "0.0.0.0"
+      SALES_AI_PORT: "8080"
+      TUZI_API_URL: "${TUZI_API_URL:-https://api.tu-zi.com/v1/messages}"
+      TUZI_API_KEY: "${TUZI_API_KEY:-}"
+      TUZI_MODEL: "${TUZI_MODEL:-claude-sonnet-4-5-20250929}"
+      TUZI_BACKUP_API_URL: "${TUZI_BACKUP_API_URL:-https://apicdn.tu-zi.com/v1/chat/completions}"
+      TUZI_BACKUP_API_KEY: "${TUZI_BACKUP_API_KEY:-}"
+      TUZI_BACKUP_MODEL: "${TUZI_BACKUP_MODEL:-claude-sonnet-4-20250514}"
+      API_TIMEOUT_THRESHOLD: "${API_TIMEOUT_THRESHOLD:-30}"
+      API_CONNECT_TIMEOUT: "${API_CONNECT_TIMEOUT:-30}"
+      API_TOTAL_TIMEOUT: "${API_TOTAL_TIMEOUT:-300}"
+      API_RETRY_COUNT: "${API_RETRY_COUNT:-1}"
+      API_MAX_TOKENS: "${API_MAX_TOKENS:-2500}"
+      API_TEMPERATURE: "${API_TEMPERATURE:-0.7}"
+      MAX_INPUT_LENGTH: "${MAX_INPUT_LENGTH:-8000}"
+      MAX_CONTEXT_MESSAGES: "${MAX_CONTEXT_MESSAGES:-10}"
+      UPLOAD_MAX_SIZE: "${UPLOAD_MAX_SIZE:-10485760}"
+    volumes:
+      - ./data:/var/www/html/data
+      - ./logs:/var/www/html/logs
+      - ./uploads:/var/www/html/uploads
+      - ./cache:/var/www/html/cache
+      - ./temp:/var/www/html/temp

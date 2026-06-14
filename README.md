@@ -30,6 +30,7 @@ Yao 的开源小工具集合，面向本地优先的 AI 编码、开发者效率
 | [toktra](tools/toktra/README.md) | Chrome MV3 扩展 | 浏览器插件 | 网页和 PDF 英译中阅读插件，支持手动/站点/全局翻译模式、划词翻译、缓存、PDF 双栏阅读和本地 API 配置。 |
 | [TokDoc](tools/TokDoc/README.md) | Node.js / Docker 本地工作台 | `npm run dev` / Docker | 本地文档管理器，支持上传 HTML/PDF/Word、目录监听、生成公开短链接、HTML 页面内编辑、回收站、访问统计和线上同步。 |
 | [TokURL](tools/tokurl/README.md) | Node.js / Docker 自托管 Web App | Docker Compose | 短链接系统，支持极短 slug、二维码、访问统计、用户管理、站点设置和本地多容器部署。 |
+| [TokChat](tools/tokchat/README.md) | PHP / Docker AI Web App | Docker Compose | 自托管 AI 对话与知识库助手，支持后台用户管理、Prompt 场景、API 轮换、知识库切片、分享页和统计面板。 |
 | [vidbrief](tools/vidbrief/README.md) | Python CLI/TUI | `vb` | 视频下载、字幕或音频转写、Transcript 整理和 AI 报告生成。 |
 | [mem](tools/mem/README.md) | Python CLI/TUI | `mem` | 本机内存、GPU、软件活跃度和进程明细诊断。 |
 | [Scai](tools/yao-scai-cli/README.md) | Python CLI/TUI | `scai` | AI-native 磁盘空间扫描与清理建议工具，用于找大文件、分析风险和生成释放空间方案。 |
