@@ -2948,6 +2948,7 @@ function esc($value) {
                         const data = await new Promise((resolve, reject) => {
                             const xhr = new XMLHttpRequest();
                             xhr.open('POST', `${API_BASE}/knowledge.php?action=upload`);
+                            xhr.timeout = 10 * 60 * 1000;
                             xhr.upload.onprogress = (event) => {
                                 if (!event.lengthComputable) return;
                                 const progress = Math.max(5, Math.min(92, Math.round((event.loaded / event.total) * 85)));
@@ -2959,7 +2960,7 @@ function esc($value) {
                                 try {
                                     response = JSON.parse(xhr.responseText || '{}');
                                 } catch (e) {
-                                    reject(new Error('服务器响应格式异常'));
+                                    reject(new Error(this.formatUploadResponseError(xhr)));
                                     return;
                                 }
                                 if (xhr.status >= 200 && xhr.status < 300) {
@@ -2968,7 +2969,8 @@ function esc($value) {
                                     reject(new Error(response.error || `上传失败 (${xhr.status})`));
                                 }
                             };
-                            xhr.onerror = () => reject(new Error('网络异常，上传失败'));
+                            xhr.onerror = () => reject(new Error('网络错误或服务器无响应'));
+                            xhr.ontimeout = () => reject(new Error('上传处理超时，请稍后查看知识库列表或检查服务器日志'));
                             xhr.send(formData);
                         });
 
@@ -2991,6 +2993,29 @@ function esc($value) {
                     } finally {
                         this.isLoading = false;
                     }
+                },
+
+                formatUploadResponseError(xhr) {
+                    const status = xhr.status || 0;
+                    const raw = String(xhr.responseText || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                    const preview = raw ? `响应摘要：${raw.slice(0, 120)}` : '服务器没有返回可解析内容';
+
+                    if (status === 413) {
+                        return '上传被服务器拒绝：文件体积超过反向代理或 PHP 限制。请检查 Nginx client_max_body_size、PHP_UPLOAD_MAX_FILESIZE 和 PHP_POST_MAX_SIZE。';
+                    }
+                    if (status === 401 || status === 403) {
+                        return `登录状态异常或没有权限 (${status})，请重新登录后台后再上传。`;
+                    }
+                    if (status === 502 || status === 504) {
+                        return `反向代理无法连接应用服务 (${status})，请检查容器状态和 Nginx 代理配置。`;
+                    }
+                    if (status >= 500) {
+                        return `服务器处理上传时发生错误 (${status})，请查看容器 logs/php_errors.log 或 docker compose logs。${raw ? ' ' + preview : ''}`;
+                    }
+                    if (status > 0) {
+                        return `服务器返回了非 JSON 响应 (${status})。${preview}`;
+                    }
+                    return '服务器响应格式异常，可能是网络中断、反向代理拦截或服务未返回内容。';
                 },
 
                 confirmUploadResult() {

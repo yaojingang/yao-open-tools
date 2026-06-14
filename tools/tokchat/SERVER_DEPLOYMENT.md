@@ -436,6 +436,13 @@ sudo tail -f /var/log/nginx/tokchat.example.com.error.log
 
 ### 文件上传失败
 
+如果页面提示“服务器响应格式异常”，先打开浏览器开发者工具的 Network，查看 `api/knowledge.php?action=upload` 的状态码：
+
+- `413`：通常是 Nginx `client_max_body_size` 太小，请确认站点配置里有 `client_max_body_size 24m;` 并已 `sudo systemctl reload nginx`。
+- `502` / `504`：反向代理没有连上容器，检查 `docker compose ps` 和 Nginx `proxy_pass`。
+- `500`：应用处理异常，查看容器日志和 `logs/php_errors.log`。
+- `200` 但不是 JSON：通常是 PHP 输出了 warning/fatal 内容，仍按 `500` 的方式查日志。
+
 检查 `.env`：
 
 ```env
@@ -445,6 +452,23 @@ UPLOAD_MAX_SIZE=10485760
 ```
 
 `PHP_POST_MAX_SIZE` 应大于 `PHP_UPLOAD_MAX_FILESIZE`，两者都应大于业务上传限制。
+
+确认 Nginx 配置里有：
+
+```nginx
+client_max_body_size 24m;
+proxy_read_timeout 360s;
+proxy_send_timeout 360s;
+```
+
+确认容器 PHP 扩展和上传目录：
+
+```bash
+docker compose exec sales-ai php -m | grep -E 'zip|mbstring|fileinfo|pdo_sqlite'
+docker compose exec sales-ai test -w /var/www/html/data/uploads
+docker compose logs --tail=100 sales-ai
+sudo tail -n 100 /var/log/nginx/tokchat.example.com.error.log
+```
 
 重新部署：
 
