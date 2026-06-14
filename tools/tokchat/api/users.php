@@ -52,6 +52,17 @@ switch ($action) {
         jsonError('未知操作');
 }
 
+function normalizeFrontendUserRole($role) {
+    $role = trim((string)$role);
+    if ($role === '' || $role === 'sales_rep' || $role === 'sales_manager') {
+        return 'user';
+    }
+    if (in_array($role, ['user', 'admin'], true)) {
+        return $role;
+    }
+    jsonError('用户角色无效');
+}
+
 /**
  * 获取用户列表
  */
@@ -66,7 +77,7 @@ function handleList() {
 
     if ($role) {
         $sql .= " AND role = ?";
-        $params[] = $role;
+        $params[] = normalizeFrontendUserRole($role);
     }
     if ($status) {
         $sql .= " AND status = ?";
@@ -124,7 +135,7 @@ function handleCreate() {
     $phone = $input['phone'] ?? '';
     $email = $input['email'] ?? '';
     $company = $input['company'] ?? '';
-    $role = $input['role'] ?? 'sales_rep';
+    $role = normalizeFrontendUserRole($input['role'] ?? 'user');
     $password = $input['password'] ?? '';
 
     if (empty($name) || empty($phone) || empty($company)) {
@@ -225,7 +236,7 @@ function handleUpdate() {
     }
     if (isset($input['role'])) {
         $updates[] = "role = ?";
-        $params[] = $input['role'];
+        $params[] = normalizeFrontendUserRole($input['role']);
     }
     if (isset($input['status'])) {
         $updates[] = "status = ?";
