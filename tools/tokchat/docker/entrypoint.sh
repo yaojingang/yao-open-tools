@@ -25,5 +25,21 @@ if [ ! -f data/sales_ai.db ]; then
     php -r "require_once '/var/www/html/api/db.php'; initDatabase(); echo \"Database initialized\n\";"
 fi
 
-echo "Starting Sales AI Assistant on ${SALES_AI_HOST:-0.0.0.0}:${SALES_AI_PORT:-8080}"
+REQUESTED_WORKERS="${PHP_CLI_SERVER_WORKERS:-16}"
+case "$REQUESTED_WORKERS" in
+    ''|*[!0-9]*)
+        REQUESTED_WORKERS=16
+        ;;
+esac
+
+if [ "$REQUESTED_WORKERS" -lt 1 ]; then
+    REQUESTED_WORKERS=1
+elif [ "$REQUESTED_WORKERS" -gt 50 ]; then
+    echo "PHP_CLI_SERVER_WORKERS capped at 50 (requested ${PHP_CLI_SERVER_WORKERS})"
+    REQUESTED_WORKERS=50
+fi
+
+export PHP_CLI_SERVER_WORKERS="$REQUESTED_WORKERS"
+
+echo "Starting Sales AI Assistant on ${SALES_AI_HOST:-0.0.0.0}:${SALES_AI_PORT:-8080} with ${PHP_CLI_SERVER_WORKERS} PHP workers"
 exec php -S "${SALES_AI_HOST:-0.0.0.0}:${SALES_AI_PORT:-8080}" -t /var/www/html /var/www/html/router.php
