@@ -121,6 +121,7 @@ PHP_MAX_EXECUTION_TIME=300
 PHP_MAX_INPUT_TIME=300
 PHP_UPLOAD_MAX_FILESIZE=20M
 PHP_POST_MAX_SIZE=24M
+PHP_CLI_SERVER_WORKERS=16
 UPLOAD_MAX_SIZE=10485760
 
 DEFAULT_ADMIN_USERNAME=admin
@@ -145,6 +146,7 @@ TUZI_MODEL=your-model-id
 - 不要把真实 `.env` 提交到 Git。
 - 如果使用云服务器安全组，确认没有放行 `18084` 到公网。
 - 如果必须公网直接访问 `18084`，至少先完成管理员密码修改。
+- `PHP_CLI_SERVER_WORKERS` 默认 `16`，用于避免单个上传/切片长请求阻塞其它页面请求；启动脚本会硬限制最大 `50`。
 
 ## 6. 启动 Docker 服务
 

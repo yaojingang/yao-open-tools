@@ -42,6 +42,7 @@ PHP_MAX_EXECUTION_TIME=300
 PHP_MAX_INPUT_TIME=300
 PHP_UPLOAD_MAX_FILESIZE=20M
 PHP_POST_MAX_SIZE=24M
+PHP_CLI_SERVER_WORKERS=16
 UPLOAD_MAX_SIZE=10485760
 DEFAULT_ADMIN_USERNAME=admin
 DEFAULT_ADMIN_PASSWORD=change-me-now
@@ -50,6 +51,8 @@ SEED_DEMO_USERS=0
 ```
 
 `PHP_UPLOAD_MAX_FILESIZE` 和 `PHP_POST_MAX_SIZE` 需要大于或等于 `UPLOAD_MAX_SIZE`，否则知识库文件上传会被 PHP 层拦截。`health.php` 会检查这些限制是否满足当前系统上传配置。
+
+`PHP_CLI_SERVER_WORKERS` 控制容器内 PHP 内置服务器的 worker 数。默认是 `16`，适合避免知识库上传、解析、切片等长请求阻塞整个站点；启动脚本会把该值限制在 `1-50` 之间。如果服务器内存较小，可降到 `4` 或 `8`。
 
 ## API Key 配置
 
