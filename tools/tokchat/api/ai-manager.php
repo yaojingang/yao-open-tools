@@ -218,18 +218,10 @@ class AIManager {
      * 记录API性能统计
      */
     private function recordStats($apiName, $success, $latency) {
+        initDatabase();
         $db = getDB();
 
         try {
-            // 创建统计表（如果不存在）
-            $db->exec("CREATE TABLE IF NOT EXISTS api_stats (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                api_name TEXT NOT NULL,
-                success INTEGER NOT NULL,
-                latency REAL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )");
-
             // 插入统计记录
             $stmt = $db->prepare("INSERT INTO api_stats (api_name, success, latency) VALUES (?, ?, ?)");
             $stmt->execute([$apiName, $success ? 1 : 0, $latency]);

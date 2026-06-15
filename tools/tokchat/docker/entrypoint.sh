@@ -20,10 +20,8 @@ EOF
 find data logs uploads cache temp -type d -exec chmod 775 {} \; 2>/dev/null || true
 find data logs uploads cache temp -type f -exec chmod 664 {} \; 2>/dev/null || true
 
-if [ ! -f data/sales_ai.db ]; then
-    echo "Initializing SQLite database..."
-    php -r "require_once '/var/www/html/api/db.php'; initDatabase(); echo \"Database initialized\n\";"
-fi
+echo "Checking SQLite database schema..."
+php -r "require_once '/var/www/html/api/db.php'; initDatabase(); echo \"Database schema ready\n\";"
 
 REQUESTED_WORKERS="${PHP_CLI_SERVER_WORKERS:-16}"
 case "$REQUESTED_WORKERS" in

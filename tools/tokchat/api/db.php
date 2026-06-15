@@ -5,6 +5,8 @@
 
 require_once __DIR__ . '/config.php';
 
+const TOKCHAT_DB_SCHEMA_VERSION = 2026061502;
+
 /**
  * 获取数据库连接
  */
@@ -28,11 +30,64 @@ function getDB() {
     return $db;
 }
 
+function getDatabaseSchemaVersion($db) {
+    try {
+        return (int)$db->query('PRAGMA user_version')->fetchColumn();
+    } catch (Throwable $e) {
+        return 0;
+    }
+}
+
+function setDatabaseSchemaVersion($db, $version = TOKCHAT_DB_SCHEMA_VERSION) {
+    $db->exec('PRAGMA user_version = ' . (int)$version);
+}
+
+function acquireDatabaseInitLock() {
+    $lockPath = dirname(DB_PATH) . '/.db-init.lock';
+    $lockDir = dirname($lockPath);
+    if (!is_dir($lockDir)) {
+        @mkdir($lockDir, 0775, true);
+    }
+
+    $lock = @fopen($lockPath, 'c');
+    if (!$lock) {
+        return null;
+    }
+
+    flock($lock, LOCK_EX);
+    return $lock;
+}
+
+function releaseDatabaseInitLock($lock) {
+    if (is_resource($lock)) {
+        flock($lock, LOCK_UN);
+        fclose($lock);
+    }
+}
+
 /**
  * 初始化数据库表结构
  */
 function initDatabase() {
+    static $initialized = false;
+
+    if ($initialized) {
+        return true;
+    }
+
     $db = getDB();
+
+    if (getDatabaseSchemaVersion($db) >= TOKCHAT_DB_SCHEMA_VERSION) {
+        $initialized = true;
+        return true;
+    }
+
+    $initLock = acquireDatabaseInitLock();
+    try {
+        if (getDatabaseSchemaVersion($db) >= TOKCHAT_DB_SCHEMA_VERSION) {
+            $initialized = true;
+            return true;
+        }
 
     // 管理员表（后台登录用）
     $db->exec("CREATE TABLE IF NOT EXISTS admins (
@@ -378,6 +433,15 @@ function initDatabase() {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )");
 
+    // API性能统计表
+    $db->exec("CREATE TABLE IF NOT EXISTS api_stats (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        api_name TEXT NOT NULL,
+        success INTEGER NOT NULL,
+        latency REAL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )");
+
     // AI API轮换策略配置
     $db->exec("CREATE TABLE IF NOT EXISTS ai_api_settings (
         setting_key TEXT PRIMARY KEY,
@@ -387,8 +451,13 @@ function initDatabase() {
 
     // 插入默认数据
     insertDefaultData($db);
+    setDatabaseSchemaVersion($db);
+    $initialized = true;
 
     return true;
+    } finally {
+        releaseDatabaseInitLock($initLock);
+    }
 }
 
 /**
@@ -515,15 +584,8 @@ function insertDefaultSiteSettings($db) {
  * 获取网站设置
  */
 function getSiteSettings() {
+    initDatabase();
     $db = getDB();
-
-    $db->exec("CREATE TABLE IF NOT EXISTS site_settings (
-        setting_key TEXT PRIMARY KEY,
-        setting_value TEXT,
-        setting_group TEXT DEFAULT 'general',
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )");
-    insertDefaultSiteSettings($db);
 
     $settings = getDefaultSiteSettings();
     $stmt = $db->query("SELECT setting_key, setting_value FROM site_settings");
@@ -649,8 +711,8 @@ function cleanupLegacySeededAPIConfigs($db) {
  * 获取AI API轮换设置
  */
 function getAIAPISettings() {
+    initDatabase();
     $db = getDB();
-    insertDefaultAIAPIConfigs($db);
 
     $settings = getDefaultAIAPISettings();
     $stmt = $db->query("SELECT setting_key, setting_value FROM ai_api_settings");
@@ -688,8 +750,8 @@ function updateAIAPISettings($settings) {
  * 获取启用的AI API配置
  */
 function getEnabledAIAPIConfigs() {
+    initDatabase();
     $db = getDB();
-    insertDefaultAIAPIConfigs($db);
 
     $stmt = $db->query("SELECT * FROM ai_api_configs
         WHERE status = 'active' AND api_type IN ('messages', 'chat_completions')
@@ -1049,8 +1111,10 @@ function applyPromptScenario($slug, $userId = 1) {
 }
 
 function getActivePromptScenario($db = null) {
-    $db = $db ?: getDB();
-    insertDefaultPromptScenarios($db);
+    if ($db === null) {
+        initDatabase();
+        $db = getDB();
+    }
 
     $stmt = $db->query("SELECT * FROM prompt_scenarios WHERE is_active = 1 ORDER BY sort_order ASC, id ASC LIMIT 1");
     $scenario = $stmt->fetch();

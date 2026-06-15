@@ -6,14 +6,7 @@
 require_once __DIR__ . '/db.php';
 
 function apiStatsEnsureTable() {
-    $db = getDB();
-    $db->exec("CREATE TABLE IF NOT EXISTS api_stats (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        api_name TEXT NOT NULL,
-        success INTEGER NOT NULL,
-        latency REAL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )");
+    initDatabase();
 }
 
 function apiStatsFetchRows($hours, $limit = 5000) {
