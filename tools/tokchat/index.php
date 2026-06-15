@@ -1150,7 +1150,7 @@ function esc($value) {
                             ${suggestions.map(s => {
                                 // 清理推荐问题中的 Markdown 标记
                                 const cleanText = s.replace(/^\*\*\s*/, '').replace(/\s*\*\*$/, '').replace(/\*\*/g, '').replace(/^##?\s*/, '').trim();
-                                return `<button onclick="fillInput(${jsArg(cleanText)})" class="block w-full text-left px-3 py-2 bg-slate-50 rounded-lg text-sm text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition whitespace-normal break-words">${escapeHtml(cleanText)}</button>`;
+                                return `<button data-fill-input="${escapeAttribute(cleanText)}" onclick="fillInput(this.dataset.fillInput)" class="block w-full text-left px-3 py-2 bg-slate-50 rounded-lg text-sm text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition whitespace-normal break-words">${escapeHtml(cleanText)}</button>`;
                             }).join('')}
                         </div>
                     </div>
@@ -1405,7 +1405,7 @@ function esc($value) {
                 buttonsHtml = `
                     <div class="mt-4 flex flex-wrap gap-2">
                         ${quickButtons.map(btn => `
-                            <button onclick="clickQuickButton(${jsArg(btn.id)}, ${jsArg(btn.label)})"
+                            <button data-button-id="${escapeAttribute(btn.id)}" data-button-label="${escapeAttribute(btn.label)}" onclick="clickQuickButton(this.dataset.buttonId, this.dataset.buttonLabel)"
                                 class="px-4 py-2 bg-white border border-slate-200 rounded-full text-sm text-slate-700 hover:border-green-400 hover:text-green-600 hover:shadow transition">
                                 ${escapeHtml(btn.label)}
                             </button>
@@ -1490,7 +1490,7 @@ function esc($value) {
                     buttonsHtml = `
                         <div class="mt-4 flex flex-wrap gap-2">
                             ${quickButtons.map(btn => `
-                                <button onclick="clickQuickButton(${jsArg(btn.id)}, ${jsArg(btn.label)})"
+                                <button data-button-id="${escapeAttribute(btn.id)}" data-button-label="${escapeAttribute(btn.label)}" onclick="clickQuickButton(this.dataset.buttonId, this.dataset.buttonLabel)"
                                     class="px-4 py-2 bg-white border border-slate-200 rounded-full text-sm text-slate-700 hover:border-blue-400 hover:text-blue-600 hover:shadow transition">
                                     ${escapeHtml(btn.label)}
                                 </button>
@@ -1509,7 +1509,7 @@ function esc($value) {
                                 ${suggestions.map(s => {
                                     // 清理推荐问题中的 Markdown 标记
                                     const cleanText = s.replace(/^\*\*\s*/, '').replace(/\s*\*\*$/, '').replace(/\*\*/g, '').replace(/^##?\s*/, '').trim();
-                                    return `<button onclick="fillInput(${jsArg(cleanText)})" class="block w-full text-left px-3 py-2 bg-slate-50 rounded-lg text-sm text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition whitespace-normal break-words">${escapeHtml(cleanText)}</button>`;
+                                    return `<button data-fill-input="${escapeAttribute(cleanText)}" onclick="fillInput(this.dataset.fillInput)" class="block w-full text-left px-3 py-2 bg-slate-50 rounded-lg text-sm text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition whitespace-normal break-words">${escapeHtml(cleanText)}</button>`;
                                 }).join('')}
                             </div>
                         </div>
@@ -1824,8 +1824,13 @@ function esc($value) {
             return div.innerHTML;
         }
 
-        function jsArg(value) {
-            return escapeHtml(JSON.stringify(String(value ?? '')));
+        function escapeAttribute(text) {
+            return String(text ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
         }
 
         // 加载历史会话
@@ -2145,7 +2150,7 @@ function esc($value) {
             }
 
             container.innerHTML = displayItems.map(item => `
-                <button onclick="fillInput('${escapeHtml(item.content)}')"
+                <button data-fill-input="${escapeAttribute(item.content)}" onclick="fillInput(this.dataset.fillInput)"
                     class="w-full text-left p-3 rounded-xl bg-slate-50 hover:bg-white hover:shadow-md border border-slate-100 hover:border-blue-200 transition group">
                     <div class="text-sm font-medium text-slate-700 group-hover:text-blue-700 transition">${escapeHtml(item.title)}</div>
                     <div class="text-xs text-slate-400 mt-1 line-clamp-1">${escapeHtml(item.subtitle || '')}</div>
@@ -2168,7 +2173,7 @@ function esc($value) {
 
                         return `
                             <div class="bg-gradient-to-br ${gradientClasses} rounded-xl p-4 border relative overflow-hidden group cursor-pointer"
-                                onclick="startLearning('${escapeHtml(item.content)}')">
+                                data-learning-content="${escapeAttribute(item.content)}" onclick="startLearning(this.dataset.learningContent)">
                                 <div class="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition">
                                     <i class="${item.icon || 'fas fa-brain'} text-4xl"></i>
                                 </div>
