@@ -18,8 +18,8 @@ function getDB() {
             $db = new PDO('sqlite:' . DB_PATH);
             $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             $db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
-            // 后台页面会并发加载多个 API，给 SQLite 写锁留出等待时间。
-            $db->exec('PRAGMA busy_timeout = 5000');
+            // 多 worker 下会有上传、切片和统计写入，给 SQLite 写锁留出等待时间。
+            $db->exec('PRAGMA busy_timeout = 30000');
             // 开启外键支持
             $db->exec('PRAGMA foreign_keys = ON');
         } catch (PDOException $e) {

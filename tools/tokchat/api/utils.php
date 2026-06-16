@@ -535,20 +535,32 @@ function buildDocumentIndex($docId, $content) {
     require_once __DIR__ . '/db.php';
     $db = getDB();
 
-    // 删除旧索引
-    $stmt = $db->prepare("DELETE FROM knowledge_index WHERE doc_id = ?");
-    $stmt->execute([$docId]);
-
-    // 提取关键词并建立索引
     $keywords = extractQueryKeywords($content);
+    $startedTransaction = !$db->inTransaction();
 
-    if (empty($keywords)) return;
+    try {
+        if ($startedTransaction) {
+            $db->beginTransaction();
+        }
 
-    $stmt = $db->prepare("INSERT INTO knowledge_index (doc_id, term, term_count) VALUES (?, ?, ?)");
+        $deleteStmt = $db->prepare("DELETE FROM knowledge_index WHERE doc_id = ?");
+        $deleteStmt->execute([$docId]);
 
-    foreach ($keywords as $term => $count) {
-        $termLower = mb_strtolower($term);
-        $stmt->execute([$docId, $termLower, $count]);
+        if (!empty($keywords)) {
+            $insertStmt = $db->prepare("INSERT INTO knowledge_index (doc_id, term, term_count) VALUES (?, ?, ?)");
+            foreach ($keywords as $term => $count) {
+                $insertStmt->execute([$docId, mb_strtolower($term), (int)$count]);
+            }
+        }
+
+        if ($startedTransaction) {
+            $db->commit();
+        }
+    } catch (Exception $e) {
+        if ($startedTransaction && $db->inTransaction()) {
+            $db->rollBack();
+        }
+        throw $e;
     }
 }
 
