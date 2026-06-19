@@ -134,6 +134,35 @@
         white-space: nowrap;
       }
 
+      .topbar-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        flex: 0 0 auto;
+      }
+
+      .source-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        min-height: 34px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--ink-soft);
+        background: #fffefa;
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+
+      .source-link:hover {
+        border-color: var(--line-strong);
+        background: #e8e6dc;
+      }
+
       .status-pill::before {
         width: 7px;
         height: 7px;
@@ -293,7 +322,7 @@
 
       table {
         width: 100%;
-        min-width: 860px;
+        min-width: 780px;
         border-collapse: collapse;
       }
 
@@ -515,8 +544,9 @@
           flex-direction: column;
         }
 
-        .status-pill {
+        .topbar-actions {
           align-self: flex-start;
+          flex-wrap: wrap;
         }
 
         .index-head {
@@ -624,7 +654,17 @@
             <span class="brand-subtitle">公开文档索引 · HTML / PDF / Word</span>
           </div>
         </div>
-        <span class="status-pill">公开阅读</span>
+        <div class="topbar-actions">
+          <span class="status-pill">公开阅读</span>
+          <a class="source-link" href="https://github.com/yaojingang/yao-open-tools/tree/main/tools/TokDoc" target="_blank" rel="noopener noreferrer" aria-label="打开 TokDoc 开源地址">
+            开源地址
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M15 3h6v6"></path>
+              <path d="M10 14 21 3"></path>
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+            </svg>
+          </a>
+        </div>
       </header>
 
       <section class="index-head" aria-label="文档索引">
@@ -661,7 +701,6 @@
             <select id="sortSelect">
               <option value="updated_desc">最近更新</option>
               <option value="created_desc">最近上传</option>
-              <option value="access_desc">访问最多</option>
             </select>
           </label>
         </div>
@@ -675,7 +714,6 @@
                 <th>目录</th>
                 <th>上传时间</th>
                 <th>大小</th>
-                <th>访问次数</th>
                 <th>打开</th>
               </tr>
             </thead>

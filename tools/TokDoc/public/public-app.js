@@ -5,10 +5,17 @@ const typeLabels = {
   word: 'Word',
 };
 
+const publicSorts = new Set(['updated_desc', 'created_desc']);
+
+function normalizePublicSort(value) {
+  const sort = String(value || 'updated_desc');
+  return publicSorts.has(sort) ? sort : 'updated_desc';
+}
+
 const state = {
   type: typeFromPath(),
   q: new URLSearchParams(window.location.search).get('q') || '',
-  sort: new URLSearchParams(window.location.search).get('sort') || 'updated_desc',
+  sort: normalizePublicSort(new URLSearchParams(window.location.search).get('sort')),
   page: Number(new URLSearchParams(window.location.search).get('page') || 1),
   pageSize: 10,
   pages: [],
@@ -74,6 +81,7 @@ function documentUrl(page) {
 
 function queryString() {
   const params = new URLSearchParams();
+  state.sort = normalizePublicSort(state.sort);
   params.set('type', state.type);
   params.set('page', String(state.page || 1));
   params.set('pageSize', String(state.pageSize || 10));
@@ -97,8 +105,9 @@ async function fetchPublicPages() {
 
 function updateUrl() {
   const params = new URLSearchParams();
+  const sort = normalizePublicSort(state.sort);
   if (state.q) params.set('q', state.q);
-  if (state.sort && state.sort !== 'updated_desc') params.set('sort', state.sort);
+  if (sort !== 'updated_desc') params.set('sort', sort);
   if (state.page && state.page > 1) params.set('page', String(state.page));
   const path = state.type === 'all' ? '/' : `/type/${state.type}`;
   const nextUrl = `${path}${params.toString() ? `?${params.toString()}` : ''}`;
@@ -140,7 +149,6 @@ function renderRows() {
         <td><span class="muted-cell">${escapeHtml(directory)}</span></td>
         <td>${escapeHtml(page.uploadTime || page.updatedTime || '-')}</td>
         <td>${escapeHtml(formatSize(page.size))}</td>
-        <td>${Number(page.accessCount || 0)}</td>
         <td>
           <a class="open-btn" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" aria-label="打开 ${escapeHtml(page.title || page.fileName || page.slug)}">
             打开
@@ -169,7 +177,7 @@ function renderCards() {
           </div>
           ${typeBadge(page)}
         </div>
-        <div class="card-meta">${escapeHtml(directory)} · ${escapeHtml(formatSize(page.size))} · ${escapeHtml(page.uploadTime || page.updatedTime || '-')} · ${Number(page.accessCount || 0)} 次访问</div>
+        <div class="card-meta">${escapeHtml(directory)} · ${escapeHtml(formatSize(page.size))} · ${escapeHtml(page.uploadTime || page.updatedTime || '-')}</div>
         <a class="open-btn" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">打开文档</a>
       </article>`;
     })
@@ -197,7 +205,7 @@ function renderEmptyState() {
 
 function render() {
   if (els.search && document.activeElement !== els.search) els.search.value = state.q || '';
-  if (els.sort) els.sort.value = state.sort || 'updated_desc';
+  if (els.sort) els.sort.value = normalizePublicSort(state.sort);
   renderStats();
   renderTabs();
   renderRows();
@@ -252,7 +260,7 @@ els.search.addEventListener('input', () => {
 });
 
 els.sort.addEventListener('change', () => {
-  state.sort = els.sort.value || 'updated_desc';
+  state.sort = normalizePublicSort(els.sort.value);
   state.page = 1;
   loadAndRender({ updateHistory: true }).catch((error) => {
     showLoadError(error);
@@ -280,7 +288,7 @@ window.addEventListener('popstate', () => {
   const params = new URLSearchParams(window.location.search);
   state.type = typeFromPath();
   state.q = params.get('q') || '';
-  state.sort = params.get('sort') || 'updated_desc';
+  state.sort = normalizePublicSort(params.get('sort'));
   state.page = Number(params.get('page') || 1);
   loadAndRender().catch((error) => {
     showLoadError(error);

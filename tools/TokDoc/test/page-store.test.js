@@ -346,7 +346,7 @@ test('builds a public page list with type filters and public-only fields', async
     relativePath: 'docs/public-html.html',
     buffer: Buffer.from('<!doctype html><html><head><title>公开 HTML</title></head><body><h1>公开 HTML</h1></body></html>'),
   });
-  await store.importBuffer({
+  const pdfPage = await store.importBuffer({
     fileName: 'public-pdf.pdf',
     relativePath: 'docs/public-pdf.pdf',
     buffer: Buffer.from('%PDF-1.4\npublic pdf\n'),
@@ -386,11 +386,16 @@ test('builds a public page list with type filters and public-only fields', async
   const html = store.listPublicPagesPage({ type: 'html' });
   assert.equal(html.pages.length, 1);
   assert.equal(html.pages[0].fileType, 'html');
-  assert.equal(html.pages[0].accessCount, 2);
+  assert.equal(Object.hasOwn(html.pages[0], 'accessCount'), false);
 
   const pdf = store.listPublicPagesPage({ type: 'pdf' });
   assert.equal(pdf.pages.length, 1);
   assert.equal(pdf.pages[0].fileType, 'pdf');
+
+  db.prepare('UPDATE pages SET updated_at = ? WHERE id = ?').run('2026-01-01T00:00:00.000Z', htmlPage.id);
+  db.prepare('UPDATE pages SET updated_at = ? WHERE id = ?').run('2026-01-02T00:00:00.000Z', pdfPage.id);
+  const blockedAccessSort = store.listPublicPagesPage({ sort: 'access_desc' });
+  assert.equal(blockedAccessSort.pages[0].slug, pdfPage.slug);
 });
 
 test('paginates the public document list with a default page size of 10', async (t) => {

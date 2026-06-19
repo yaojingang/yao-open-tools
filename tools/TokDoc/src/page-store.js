@@ -155,7 +155,6 @@ function publicPageSummary(page) {
     size: page.size,
     uploadTime: page.uploadTime,
     updatedTime: page.updatedTime,
-    accessCount: page.accessCount,
     url: page.url,
   };
 }
@@ -337,8 +336,11 @@ export class PageStore {
   listPublicPagesPage(filters = {}) {
     const type = String(filters.type || filters.fileType || 'all').trim().toLowerCase();
     const normalizedType = ['html', 'pdf', 'word'].includes(type) ? type : 'all';
+    const requestedSort = String(filters.sort || 'updated_desc').trim();
+    const publicSort = ['updated_desc', 'created_desc'].includes(requestedSort) ? requestedSort : 'updated_desc';
     const allFilteredPages = this.listPages({
       ...filters,
+      sort: publicSort,
       scope: 'active',
       status: 'all',
       type: normalizedType,
