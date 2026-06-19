@@ -1,8 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "tokscr",
-  "description": "Capture, edit, crop, and export webpage screenshots to PNG, JPEG, PDF, clipboard, or print.",
-  "version": "0.4.7",
+  "name": "__MSG_appName__",
+  "short_name": "__MSG_appShortName__",
+  "description": "__MSG_appDescription__",
+  "version": "0.4.8",
+  "default_locale": "zh_CN",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -13,7 +15,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "tokscr",
+    "default_title": "__MSG_actionTitle__",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",

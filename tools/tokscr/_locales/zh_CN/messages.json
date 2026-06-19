@@ -1,0 +1,18 @@
+{
+  "appName": {
+    "message": "tokscr - 网页截图、长截图、区域截图工具",
+    "description": "Chrome Web Store 和扩展管理页使用的中文扩展名称。"
+  },
+  "appShortName": {
+    "message": "tokscr",
+    "description": "空间有限时显示的短名称。"
+  },
+  "appDescription": {
+    "message": "干净本地优先的 Chrome 网页截图工具，支持完整长截图、可见区域、框选区域、主体去噪、标注编辑，以及 PNG/JPEG/PDF/复制/打印导出。",
+    "description": "Chrome Web Store 和扩展管理页使用的中文短描述。"
+  },
+  "actionTitle": {
+    "message": "tokscr 网页截图",
+    "description": "浏览器工具栏按钮提示。"
+  }
+}

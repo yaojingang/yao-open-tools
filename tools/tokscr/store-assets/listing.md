@@ -1,75 +1,82 @@
-# Chrome Web Store Listing Draft
+# Chrome Web Store 中文上架文案草稿
 
-## Name
+## 名称
 
-tokscr
+tokscr - 网页截图、长截图、区域截图工具
 
-## Summary
+## 摘要
 
-Capture, edit, crop, and export webpage screenshots to PNG, JPEG, PDF, clipboard, or print.
+干净本地优先的 Chrome 网页截图工具，支持完整长截图、可见区域、框选区域、主体去噪、标注编辑，以及 PNG/JPEG/PDF/复制/打印导出。
 
-## Description
+## 详细描述
 
-tokscr is a local-first webpage screenshot tool for Chrome.
+tokscr 是一个干净、本地优先的 Chrome 网页截图工具，适合网页证据留存、产品界面归档、长文档截图、社媒页面截图、内容页面摘取和日常沟通标注。
 
-Capture what you need:
+它的设计重点是少打扰、低权限、不上传。截图、拼接、裁剪、编辑和导出都在浏览器本地完成；扩展只在你主动点击截图时访问当前标签页，不会持续监听页面，也不会把截图、网页内容、网址或浏览历史发送到外部服务器。
 
-- Full page: automatically scroll and stitch the entire webpage.
-- Visible area: capture only what is currently visible in the browser.
-- Selected area: drag to select a precise region on the page.
-- Main-content cleanup: detect the primary content area and crop away navigation, sidebars, and page noise.
-- Result-page crop: adjust the final screenshot with a draggable crop box before exporting.
-- Lightweight editor: add text, arrows, rectangles, freehand marks, mosaic blur, and solid covers directly on the screenshot.
+主要能力：
 
-Export the result:
+- 完整长截图：自动滚动并拼接整个网页，适合长文章、文档页、详情页和报告页。
+- 可见区域截图：快速截取当前窗口正在看到的页面状态。
+- 框选区域截图：在网页上拖拽选择精准区域，适合截取某个表格、模块、UI 片段或内容段落。
+- 主体去噪：本地识别文章、文档、详情页等主体区域，尽量裁掉导航栏、侧边栏、页脚和其他页面噪音。
+- 结果页二次裁剪：截图生成后还能继续拖动裁剪框微调边界，裁掉多余空白或干扰元素。
+- 轻量标注编辑：直接在截图上添加文字、箭头、矩形、画笔、马赛克和遮盖，方便突出重点或遮挡敏感信息。
+- 多格式导出：支持保存为 PNG、JPEG、PDF，也可以复制到剪贴板或直接打印。
 
-- Save as PNG
-- Save as JPEG
-- Save as PDF
-- Copy the screenshot to clipboard
-- Print directly from the preview page
+适合这些场景：
 
-Privacy-first by design:
+- 保存网页证据、订单/后台页面、配置页面和问题现场。
+- 截取产品界面、竞品页面、活动页和长内容页面。
+- 把网页截图快速贴到聊天、文档、工单、Notion、飞书或邮件里。
+- 做简洁的局部标注、隐私遮盖和内容归档。
 
-- Screenshots are generated locally in your browser.
-- Screenshots are not uploaded to any server.
-- tokscr only accesses the current tab when you actively start a capture.
+为什么说它干净：
 
-## Category
+- 不需要账号。
+- 不依赖远程服务。
+- 不上传截图。
+- 不收集用户数据。
+- 不申请长期站点访问权限。
+- 不在后台持续监听页面。
+- 截图结果只临时保存在浏览器本地 IndexedDB 中，用于打开结果页和完成导出。
 
-Productivity
+## 分类
 
-## Language
+Productivity（效率）
 
-English
+## 语言
 
-## Privacy Practices
+中文（简体）
 
-Data collection: No user data collected.
+## 隐私实践
 
-Single-purpose statement:
+数据收集：不收集用户数据。
 
-tokscr captures screenshots of the current webpage at the user's request and lets the user edit, crop, export, copy, or print the screenshot locally.
+单一用途说明：
 
-Permission justifications:
+tokscr 根据用户主动发起的操作截取当前网页，并让用户在本地完成截图预览、裁剪、标注、导出、复制或打印。
 
-- activeTab: access the current page only after the user clicks a capture action.
-- scripting: inject the capture helper used for page scrolling, main-content detection, and selected-area overlays.
-- downloads: save exported PNG, JPEG, and PDF files.
-- clipboardWrite: copy generated screenshots to the clipboard.
-- offscreen: compose screenshots and convert image blobs in a hidden extension document.
-Generated screenshots are stored temporarily in local IndexedDB so the result preview page can load them. This does not require the Chrome extension `storage` permission.
+权限说明：
 
-Remote code: none.
+- `activeTab`：仅在用户点击截图操作后访问当前标签页。
+- `scripting`：注入截图辅助脚本，用于页面滚动、主体识别和框选区域遮罩。
+- `downloads`：保存导出的 PNG、JPEG 和 PDF 文件。
+- `clipboardWrite`：把用户生成的截图复制到剪贴板。
+- `offscreen`：在隐藏的扩展页面中拼接截图并转换图片数据。
 
-User data handling:
+生成的截图会临时保存在浏览器本地 IndexedDB 中，让结果预览页可以读取和导出截图；这不需要 Chrome 扩展的 `storage` 权限。
 
-Screenshots and metadata are processed locally in the browser. The extension does not transmit screenshots, page content, URLs, browsing history, or personal information to any external server.
+远程代码：无。
 
-## Store Assets
+用户数据处理：
 
-- Screenshot 1: `store-assets/screenshot-1-capture-modes.png`
-- Screenshot 2: `store-assets/screenshot-2-result-workbench.png`
-- Screenshot 3: `store-assets/screenshot-3-privacy.png`
-- Small promo tile: `store-assets/promo-small-440x280.png`
-- Extension package: `dist/tokscr-0.4.7.zip`
+截图和元数据都在浏览器本地处理。扩展不会把截图、网页内容、网址、浏览历史或个人信息传输到任何外部服务器。
+
+## 商店素材
+
+- 截图 1：`store-assets/screenshot-1-capture-modes.png`
+- 截图 2：`store-assets/screenshot-2-result-workbench.png`
+- 截图 3：`store-assets/screenshot-3-privacy.png`
+- 小型宣传图块：`store-assets/promo-small-440x280.png`
+- 扩展上传包：`dist/tokscr-0.4.8.zip`

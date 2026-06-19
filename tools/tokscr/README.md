@@ -2,7 +2,7 @@
 
 `tokscr` 是一个 Chrome MV3 网页截图插件，面向需要快速留存网页证据、内容页面、产品界面、长文档和社媒页面的场景。它默认在本地完成截图、拼接、预览和导出，不依赖远程服务，也不会把截图上传到服务器。
 
-当前版本：`0.4.7`
+当前版本：`0.4.8`
 
 ## 截图示例
 
@@ -25,7 +25,7 @@
 - **多格式导出**：结果页支持 PNG、JPEG、PDF、复制到剪贴板和打印。
 - **本地优先**：截图生成、裁剪、拼接、导出都在浏览器本地执行。
 - **低权限设计**：使用 `activeTab` 和用户主动点击触发，不申请全站点长期访问权限。
-- **Chrome Web Store 可发布包**：当前可上传包为 `dist/tokscr-0.4.7.zip`。
+- **Chrome Web Store 可发布包**：当前可上传包为 `dist/tokscr-0.4.8.zip`。
 
 ## 功能一览
 
@@ -160,10 +160,11 @@ tools/tokscr/
   result.css
   result.js
   icons/
+  _locales/zh_CN/
   store-assets/
   docs/assets/
   tests/
-  dist/tokscr-0.4.7.zip
+  dist/tokscr-0.4.8.zip
 ```
 
 ## 本地加载
@@ -184,7 +185,7 @@ tools/tokscr/
 当前可上传 Chrome Web Store 的包：
 
 ```text
-tools/tokscr/dist/tokscr-0.4.7.zip
+tools/tokscr/dist/tokscr-0.4.8.zip
 ```
 
 注意：zip 根目录包含 `manifest.json`，上传时不要再套一层外部文件夹。
@@ -192,8 +193,9 @@ tools/tokscr/dist/tokscr-0.4.7.zip
 重新打包可在 `tools/tokscr` 目录执行：
 
 ```bash
-zip -r dist/tokscr-0.4.7.zip \
+zip -r dist/tokscr-0.4.8.zip \
   manifest.json \
+  _locales \
   background.js capture-store.js content.js crop-utils.js editor-utils.js \
   offscreen.html offscreen.js \
   popup.html popup.css popup.js \
@@ -219,7 +221,7 @@ node --test tests/*.test.js
 - `screenshot-1-capture-modes.png`：截图模式示例
 - `screenshot-2-result-workbench.png`：结果工作台示例
 - `screenshot-3-privacy.png`：隐私说明示例
-- `dist/tokscr-0.4.7.zip`：当前 Chrome Web Store 上传包
+- `dist/tokscr-0.4.8.zip`：当前 Chrome Web Store 上传包
 
 ## 使用限制
 

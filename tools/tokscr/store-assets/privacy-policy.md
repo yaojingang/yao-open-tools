@@ -1,31 +1,31 @@
-# tokscr Privacy Policy
+# tokscr 隐私政策
 
-Effective date: May 12, 2026
+生效日期：2026 年 6 月 19 日
 
-tokscr is a local-first Chrome extension for capturing webpage screenshots.
+tokscr 是一个本地优先的 Chrome 网页截图扩展。
 
-## Data Collection
+## 数据收集
 
-tokscr does not collect, sell, share, or transfer user data.
+tokscr 不收集、出售、共享或转移用户数据。
 
-## Local Processing
+## 本地处理
 
-Screenshots are generated locally in the browser. The extension may temporarily store generated screenshot blobs and basic metadata, such as title, URL, image size, and capture time, in the browser's local IndexedDB storage so the result preview page can display and export the screenshot.
+截图在浏览器本地生成。为了让结果预览页展示和导出截图，扩展可能会把生成的截图 Blob 和基础元数据临时保存在浏览器本地 IndexedDB 中，例如标题、URL、图片尺寸和截图时间。
 
-## Network Transfer
+## 网络传输
 
-tokscr does not upload screenshots, webpage content, URLs, browsing history, or personal information to any external server.
+tokscr 不会把截图、网页内容、URL、浏览历史或个人信息上传到任何外部服务器。
 
-## Permissions
+## 权限
 
-tokscr uses Chrome extension permissions only for its screenshot workflow:
+tokscr 只为截图工作流使用 Chrome 扩展权限：
 
-- `activeTab`: access the current page when the user starts a capture.
-- `scripting`: inject the helper used for scrolling, selected-area capture, and main-content detection.
-- `downloads`: save exported files.
-- `clipboardWrite`: copy screenshots to the clipboard.
-- `offscreen`: compose screenshots and convert image blobs in a hidden extension page.
+- `activeTab`：在用户主动开始截图时访问当前页面。
+- `scripting`：注入用于页面滚动、框选区域截图和主体内容识别的辅助脚本。
+- `downloads`：保存导出的文件。
+- `clipboardWrite`：把截图复制到剪贴板。
+- `offscreen`：在隐藏的扩展页面中拼接截图并转换图片数据。
 
-## Contact
+## 联系方式
 
-For privacy questions, contact the extension publisher through the Chrome Web Store listing.
+如有隐私相关问题，请通过 Chrome Web Store 商品详情页联系扩展发布者。
