@@ -14,6 +14,7 @@
 | [`TokDoc/`](TokDoc/README.md) | `npm run dev` / Docker | Node.js Local Web App | 本地文档管理器，支持上传 HTML/PDF/Word、目录监听、生成公开短链接、HTML 页面内编辑、回收站、访问统计和线上同步。 |
 | [`tokurl/`](tokurl/README.md) | Docker Compose | Node.js / Docker Web App | 自托管短链接系统，支持二维码、访问统计、用户管理、站点设置和本地多容器部署。 |
 | [`tokchat/`](tokchat/README.md) | Docker Compose | PHP / Docker AI Web App | 自托管 AI 对话与知识库助手，支持用户管理、Prompt 场景、API 轮换、知识库切片、分享页和统计面板。 |
+| [`live-quiz-interaction/`](live-quiz-interaction/README.md) | `npm run dev` / 静态部署 | React Static Web App | 直播课堂填空答题互动页，内置有理数 100 题、积分、弹窗反馈、提示和解析。 |
 | [`vidbrief/`](vidbrief/README.md) | `vb` | Python CLI/TUI | 视频下载、字幕提取、音频转写和 AI Markdown 报告生成。 |
 | [`mem/`](mem/README.md) | `mem` | Python CLI/TUI | 本机内存、GPU、软件活跃度和进程热点诊断。 |
 | [`yao-scai-cli/`](yao-scai-cli/README.md) | `scai` | Python CLI/TUI | 磁盘空间扫描、风险分类和安全清理建议。 |
