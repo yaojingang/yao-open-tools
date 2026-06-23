@@ -10,11 +10,7 @@
   --border: #e8e5da;
   --ring: #d1cfc5;
   --good: #2f6b3d;
-  --good-soft: #edf7ee;
-  --good-line: #c8dec9;
   --bad: #9a3b30;
-  --bad-soft: #fbefed;
-  --bad-line: #e8c8c2;
 }
 
 * {
@@ -153,8 +149,7 @@ h2 span {
   gap: 7px;
 }
 
-.answer-form label,
-.coach-label {
+.answer-form label {
   color: var(--olive);
   font-size: 12px;
   font-weight: 700;
@@ -167,15 +162,16 @@ h2 span {
 }
 
 input {
-  min-height: 44px;
+  min-height: 54px;
   width: 100%;
   border: 1px solid var(--ring);
   border-radius: 7px;
-  padding: 0 13px;
+  padding: 0 16px;
   color: var(--ink);
   background: #fffefa;
   outline: none;
-  font-size: 17px;
+  font-size: 22px;
+  line-height: 1.2;
 }
 
 input:focus,
@@ -205,7 +201,7 @@ button {
 }
 
 .answer-row button {
-  min-height: 44px;
+  min-height: 54px;
   border-color: var(--brand);
   color: var(--ivory);
   background: var(--brand);
@@ -216,56 +212,11 @@ button:disabled {
   opacity: 0.55;
 }
 
-.coach {
-  min-height: 88px;
-  margin-top: 14px;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--brand);
-  border-radius: 8px;
-  padding: 13px 15px;
-  color: var(--olive);
-  background: #fffefa;
-}
-
-.coach-label {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--brand);
-}
-
-.coach p {
-  margin-top: 7px;
-  color: var(--warm);
-  font-size: 15px;
-  line-height: 1.45;
-}
-
-.coach.correct {
-  border-color: var(--good-line);
-  border-left-color: var(--good);
-  background: var(--good-soft);
-}
-
-.coach.correct .coach-label {
-  color: var(--good);
-}
-
-.coach.wrong {
-  border-color: var(--bad-line);
-  border-left-color: var(--bad);
-  background: var(--bad-soft);
-}
-
-.coach.wrong .coach-label {
-  color: var(--bad);
-}
-
 .actions {
   display: flex;
   justify-content: space-between;
   gap: 9px;
-  margin-top: 16px;
+  margin-top: 18px;
 }
 
 .dialog-layer {
@@ -389,6 +340,15 @@ button:disabled {
   h2 {
     min-height: 96px;
     font-size: 25px;
+  }
+
+  input,
+  .answer-row button {
+    min-height: 50px;
+  }
+
+  input {
+    font-size: 19px;
   }
 
   .result-dialog {

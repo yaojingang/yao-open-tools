@@ -14,8 +14,10 @@ describe('App', () => {
         (question) => question.guide.length > 8 && question.explanation.length > 8,
       ),
     ).toBe(true)
+    expect(screen.getByRole('heading', { name: '有理数百问百答' })).toBeInTheDocument()
     expect(screen.getByText('第 1 / 100 题')).toBeInTheDocument()
     expect(screen.getByText('____ 既不是正数，也不是负数。')).toBeInTheDocument()
+    expect(document.querySelector('.coach')).not.toBeInTheDocument()
   })
 
   it('awards points and shows a celebration state for a correct answer', async () => {
@@ -27,9 +29,8 @@ describe('App', () => {
 
     expect(screen.getByRole('dialog')).toHaveTextContent('答对了')
     expect(screen.getByText('回答正确，获得满分')).toBeInTheDocument()
-    expect(screen.getByText('解析')).toBeInTheDocument()
-    expect(screen.getByText('解析').closest('.coach')).toHaveClass('correct')
-    expect(screen.getByText(/0 既不是正数，也不是负数/)).toBeInTheDocument()
+    expect(screen.queryByText('解析')).not.toBeInTheDocument()
+    expect(document.querySelector('.coach')).not.toBeInTheDocument()
     expect(screen.getByText('100')).toBeInTheDocument()
   })
 
@@ -42,9 +43,8 @@ describe('App', () => {
 
     expect(screen.getByRole('dialog')).toHaveTextContent('答错了')
     expect(screen.getByText('回答错误，已触发第 1 次提醒')).toBeInTheDocument()
-    expect(screen.getByText('提示')).toBeInTheDocument()
-    expect(screen.getByText('提示').closest('.coach')).toHaveClass('wrong')
-    expect(screen.getByText(/本题考查：____ 既不是正数/)).toBeInTheDocument()
+    expect(screen.queryByText('提示')).not.toBeInTheDocument()
+    expect(document.querySelector('.coach')).not.toBeInTheDocument()
     expect(screen.getAllByText('-10').length).toBeGreaterThan(0)
   })
 })

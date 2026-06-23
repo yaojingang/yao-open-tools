@@ -2,7 +2,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
-  Lightbulb,
   RotateCcw,
   Send,
   Trophy,
@@ -13,7 +12,7 @@ import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import './App.css'
 import { rationalQuestions } from './data/rationalQuestions'
-import type { QuizFeedback, QuizQuestion } from './domain/types'
+import type { QuizFeedback } from './domain/types'
 import {
   createQuizState,
   getScoreSummary,
@@ -35,7 +34,6 @@ function App() {
     ((summary.correct + summary.incorrect) / summary.total) * 100,
   )
   const canAnswer = attempt?.status === 'unanswered'
-  const panel = getCoachPanel(quizState.feedback, question)
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -79,7 +77,7 @@ function App() {
       <header className="masthead">
         <div>
           <p className="kicker">有理数经典 100 题</p>
-          <h1>直播填空答题</h1>
+          <h1>有理数百问百答</h1>
         </div>
         <div className="score" aria-label="总积分">
           <Trophy aria-hidden="true" size={16} />
@@ -125,14 +123,6 @@ function App() {
             </button>
           </div>
         </form>
-
-        <section className={`coach ${panel.kind}`} aria-live="polite">
-          <div className="coach-label">
-            <Lightbulb aria-hidden="true" size={15} />
-            <span>{panel.title}</span>
-          </div>
-          <p>{panel.body}</p>
-        </section>
 
         <nav className="actions" aria-label="题目操作">
           <button type="button" onClick={() => jumpTo(quizState.currentIndex - 1)}>
@@ -181,38 +171,6 @@ function ResultDialog({
       </div>
     </div>
   )
-}
-
-function getCoachPanel(feedback: QuizFeedback, question: QuizQuestion) {
-  if (feedback.kind === 'correct') {
-    return {
-      kind: 'correct',
-      title: '解析',
-      body: question.explanation,
-    }
-  }
-
-  if (feedback.kind === 'locked') {
-    return {
-      kind: 'wrong',
-      title: '解析',
-      body: `正确答案：${feedback.correctAnswer}。${question.explanation}`,
-    }
-  }
-
-  if (feedback.kind === 'wrong') {
-    return {
-      kind: 'wrong',
-      title: '提示',
-      body: feedback.hint ?? question.guide,
-    }
-  }
-
-  return {
-    kind: 'idle',
-    title: '提示',
-    body: question.guide,
-  }
 }
 
 function formatPoints(points: number) {
