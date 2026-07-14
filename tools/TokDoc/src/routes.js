@@ -12,6 +12,7 @@ function publicPage(page) {
   return {
     ...page,
     canEdit: isEditableFileType(page.fileType, page.mimeType),
+    canEditMarkdownSource: page.fileType === 'markdown' && Boolean(page.sourcePath),
     canSync: page.fileType === 'html',
     canEditSource: page.sourceType === 'watch',
   };
@@ -116,6 +117,11 @@ async function syncPageToRemote(app, page) {
 function inlineContentDisposition(fileName) {
   const fallback = String(fileName || 'document.pdf').replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '') || 'document.pdf';
   return `inline; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(fileName || fallback)}`;
+}
+
+function attachmentContentDisposition(fileName) {
+  const fallback = String(fileName || 'document').replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '') || 'document';
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(fileName || fallback)}`;
 }
 
 function parseCookies(cookieHeader = '') {
@@ -318,6 +324,19 @@ function registerApiRoutes(app, prefix = '') {
     return { page: publicPage(page), html };
   });
 
+  app.get(`${prefix}/api/pages/:id/download`, async (request, reply) => {
+    const page = app.store.getPage(request.params.id);
+    if (!page || page.deletedAt) return sendNotFound(reply, 'Page not found');
+    const filePath = await app.store.resolveGeneratedPath(page);
+    const buffer = await app.store.readPageFile(page);
+    app.store.incrementDownloadCount(page.id);
+    return reply
+      .header('cache-control', 'no-store')
+      .header('content-disposition', attachmentContentDisposition(path.basename(filePath || page.generatedPath || page.fileName)))
+      .type(page.mimeType || 'application/octet-stream')
+      .send(buffer);
+  });
+
   app.post(`${prefix}/api/pages/upload`, async (request, reply) => {
     const files = await collectUploadParts(request);
     let created;
@@ -401,6 +420,39 @@ function registerApiRoutes(app, prefix = '') {
     const page = app.store.updatePageVisibility(request.params.id, body.visibility);
     if (!page) return sendNotFound(reply, 'Page not found');
     return { page: publicPage(page) };
+  });
+
+  app.get(`${prefix}/api/pages/:id/source`, async (request, reply) => {
+    try {
+      const source = await app.store.readMarkdownSource(request.params.id);
+      return {
+        page: publicPage(source.page),
+        markdown: source.markdown,
+        sourceOutOfSync: source.sourceOutOfSync,
+      };
+    } catch (error) {
+      if (error.code === 'DOCUMENT_NOT_EDITABLE') return reply.code(400).send({ error: error.message });
+      if (error.code === 'MARKDOWN_SOURCE_UNAVAILABLE') return reply.code(404).send({ error: error.message });
+      if (error.code === 'NOT_FOUND') return sendNotFound(reply, error.message);
+      throw error;
+    }
+  });
+
+  app.patch(`${prefix}/api/pages/:id/source`, async (request, reply) => {
+    try {
+      const page = await app.store.saveMarkdownSource(request.params.id, request.body || {});
+      return { page: publicPage(page) };
+    } catch (error) {
+      if (error.code === 'REVISION_CONFLICT') {
+        return reply.code(409).send({ error: 'Revision conflict', page: publicPage(error.page) });
+      }
+      if (error.code === 'DOCUMENT_NOT_EDITABLE' || error.code === 'MARKDOWN_SOURCE_READ_ONLY') {
+        return reply.code(400).send({ error: error.message });
+      }
+      if (error.code === 'MARKDOWN_SOURCE_UNAVAILABLE') return reply.code(404).send({ error: error.message });
+      if (error.code === 'NOT_FOUND') return sendNotFound(reply, error.message);
+      throw error;
+    }
   });
 
   app.patch(`${prefix}/api/pages/:id/content`, async (request, reply) => {

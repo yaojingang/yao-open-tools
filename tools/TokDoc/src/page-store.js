@@ -10,6 +10,7 @@ import {
   buildManagedSlug,
   composeDocument,
   documentTitleFromFileName,
+  extractAssetBaseUrl,
   generatedMimeType,
   injectAssetBase,
   injectTrackingCode,
@@ -131,6 +132,7 @@ function rowToPage(row) {
     checksum: row.checksum,
     edited: Boolean(row.edited),
     accessCount: row.access_count || 0,
+    downloadCount: row.download_count || 0,
     visibility: normalizeVisibility(row.visibility),
     deletedAt: row.deleted_at || '',
     deletedTime: row.deleted_at ? displayTime(row.deleted_at) : '',
@@ -460,6 +462,31 @@ export class PageStore {
 
   async readPageFile(page) {
     return fs.readFile(await this.resolveGeneratedPath(page));
+  }
+
+  async readMarkdownSource(id) {
+    const page = this.getPage(id);
+    if (!page || page.deletedAt) {
+      const error = new Error('Page not found');
+      error.code = 'NOT_FOUND';
+      throw error;
+    }
+    if (page.fileType !== 'markdown') {
+      const error = new Error('Only Markdown documents support source editing');
+      error.code = 'DOCUMENT_NOT_EDITABLE';
+      throw error;
+    }
+    if (!page.sourcePath || !(await pathExists(page.sourcePath))) {
+      const error = new Error('Markdown source file is unavailable');
+      error.code = 'MARKDOWN_SOURCE_UNAVAILABLE';
+      throw error;
+    }
+    const markdown = await fs.readFile(page.sourcePath, 'utf8');
+    return {
+      page,
+      markdown,
+      sourceOutOfSync: page.edited && page.checksum !== checksum(markdown),
+    };
   }
 
   async resolveGeneratedPath(page) {
@@ -805,6 +832,7 @@ export class PageStore {
       checksum: checksum(sourceChecksum),
       edited: 0,
       accessCount: 0,
+      downloadCount: 0,
       visibility: normalizeVisibility(visibility),
     };
     this.insertPage(info);
@@ -863,6 +891,7 @@ export class PageStore {
       checksum: checksum(buffer),
       edited: 0,
       accessCount: 0,
+      downloadCount: 0,
       visibility: normalizeVisibility(visibility),
     };
     this.insertPage(info);
@@ -934,8 +963,8 @@ export class PageStore {
       .prepare(
         `INSERT INTO pages (
           id, slug, file_name, title, source_type, source_path, directory_name, size, status,
-          created_at, updated_at, revision, generated_path, file_type, mime_type, raw_mtime_ms, checksum, edited, access_count, visibility
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          created_at, updated_at, revision, generated_path, file_type, mime_type, raw_mtime_ms, checksum, edited, access_count, download_count, visibility
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         info.id,
@@ -956,7 +985,8 @@ export class PageStore {
         info.rawMtimeMs,
         info.checksum,
         info.edited,
-        info.accessCount,
+        info.accessCount ?? 0,
+        info.downloadCount ?? 0,
         normalizeVisibility(info.visibility),
       );
   }
@@ -1141,6 +1171,11 @@ export class PageStore {
     return this.getPage(id);
   }
 
+  incrementDownloadCount(id) {
+    this.db.prepare('UPDATE pages SET download_count = download_count + 1 WHERE id = ?').run(id);
+    return this.getPage(id);
+  }
+
   uniqueSlug(base, pageId = null) {
     let slug = base || 'page';
     let index = 2;
@@ -1308,6 +1343,56 @@ export class PageStore {
          checksum = ?, edited = 1 WHERE id = ?`,
       )
       .run(parsed.title, Buffer.byteLength(nextContent), 'edited', now, generatedPath, checksum(nextContent), id);
+    return this.getPage(id);
+  }
+
+  async saveMarkdownSource(id, { markdown, revision, reason = 'autosave-source' } = {}) {
+    const page = this.getPage(id);
+    if (!page || page.deletedAt) {
+      const error = new Error('Page not found');
+      error.code = 'NOT_FOUND';
+      throw error;
+    }
+    if (page.fileType !== 'markdown') {
+      const error = new Error('Only Markdown documents support source editing');
+      error.code = 'DOCUMENT_NOT_EDITABLE';
+      throw error;
+    }
+    if (revision != null && Number(revision) !== Number(page.revision)) {
+      const error = new Error('Revision conflict');
+      error.code = 'REVISION_CONFLICT';
+      error.page = page;
+      throw error;
+    }
+    if (!page.sourcePath || !(await pathExists(page.sourcePath))) {
+      const error = new Error('Markdown source file is unavailable');
+      error.code = 'MARKDOWN_SOURCE_UNAVAILABLE';
+      throw error;
+    }
+    const watchDir = this.watchDirForPath(page.sourcePath);
+    if (page.sourceType !== 'upload' && !watchDir?.allowWrite) {
+      const error = new Error('Markdown source file is read-only');
+      error.code = 'MARKDOWN_SOURCE_READ_ONLY';
+      throw error;
+    }
+
+    const source = String(markdown ?? '');
+    const currentContent = await this.readPageHtml(page);
+    await this.writeVersion(page, currentContent, reason);
+    await fs.writeFile(page.sourcePath, source);
+    const assetBaseUrl = extractAssetBaseUrl(currentContent);
+    const nextContent = this.prepareGeneratedHtml(renderMarkdownDocument(source, page.fileName), assetBaseUrl);
+    const generatedPath = await this.resolveGeneratedPath(page);
+    await fs.writeFile(generatedPath, nextContent);
+    const parsed = parseHtmlMetadata(nextContent, page.fileName);
+    const stat = await fs.stat(page.sourcePath);
+    const now = nowIso();
+    this.db
+      .prepare(
+        `UPDATE pages SET title = ?, size = ?, status = ?, updated_at = ?, revision = revision + 1, generated_path = ?,
+         raw_mtime_ms = ?, checksum = ?, edited = 1 WHERE id = ?`,
+      )
+      .run(parsed.title, Buffer.byteLength(nextContent), 'edited', now, generatedPath, Math.round(stat.mtimeMs), checksum(source), id);
     return this.getPage(id);
   }
 

@@ -139,7 +139,7 @@ test('opens legacy databases by adding columns without deleting pages or setting
   await store.ensureStorage();
 
   const columns = db.prepare('PRAGMA table_info(pages)').all().map((column) => column.name);
-  for (const column of ['access_count', 'deleted_at', 'deleted_path', 'file_type', 'mime_type', 'visibility']) {
+  for (const column of ['access_count', 'download_count', 'deleted_at', 'deleted_path', 'file_type', 'mime_type', 'visibility']) {
     assert.equal(columns.includes(column), true);
   }
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM pages').get().count, 1);
@@ -150,6 +150,7 @@ test('opens legacy databases by adding columns without deleting pages or setting
   assert.equal(page.mimeType, 'text/html; charset=utf-8');
   assert.equal(page.visibility, 'public');
   assert.equal(page.accessCount, 0);
+  assert.equal(page.downloadCount, 0);
   assert.equal(page.deletedAt, '');
   assert.match(await fs.readFile(generatedPath, 'utf8'), /旧页面/);
   assert.equal(store.getAuthSettings().authUsername, 'legacy-owner');
@@ -698,6 +699,55 @@ test('autosaves generated Markdown and Word HTML documents', async (t) => {
   assert.match(await store.readPageHtml(savedWord), /已在线修改 Word/);
 });
 
+test('saves Markdown source editor changes and regenerates the readable page', async (t) => {
+  const { store, db, dataDir } = await createStore();
+  t.after(() => db.close());
+  t.after(() => fs.rm(dataDir, { recursive: true, force: true }));
+
+  const [page] = await store.importUploadFiles([
+    {
+      fileName: 'guide.md',
+      relativePath: 'bundle/docs/guide.md',
+      buffer: Buffer.from('# 原始标题\n\n![图](images/logo.png)\n\n原始段落'),
+    },
+    {
+      fileName: 'logo.png',
+      relativePath: 'bundle/docs/images/logo.png',
+      buffer: Buffer.from('image-bytes'),
+    },
+  ]);
+  const source = await store.readMarkdownSource(page.id);
+  assert.equal(source.markdown, '# 原始标题\n\n![图](images/logo.png)\n\n原始段落');
+  assert.equal(source.sourceOutOfSync, false);
+  assert.match(await store.readPageHtml(page), /<base data-tokdoc-base href="\/page-assets\/[^"]+\/bundle\/docs\/">/);
+
+  const saved = await store.saveMarkdownSource(page.id, {
+    revision: page.revision,
+    reason: 'manual-source',
+    markdown: '# 新源码标题\n\n这是 **编辑器修改** 后的正文。\n\n![图](images/logo.png)',
+  });
+
+  assert.equal(saved.title, '新源码标题');
+  assert.equal(saved.revision, 2);
+  assert.equal(saved.edited, true);
+  assert.equal(store.listVersions(page.id).length, 1);
+  assert.equal(await fs.readFile(page.sourcePath, 'utf8'), '# 新源码标题\n\n这是 **编辑器修改** 后的正文。\n\n![图](images/logo.png)');
+  const html = await store.readPageHtml(saved);
+  assert.match(html, /<h1>新源码标题<\/h1>/);
+  assert.match(html, /<strong>编辑器修改<\/strong>/);
+  assert.match(html, /<base data-tokdoc-base href="\/page-assets\/[^"]+\/bundle\/docs\/">/);
+  assert.equal((await store.readMarkdownSource(page.id)).sourceOutOfSync, false);
+
+  await assert.rejects(
+    () =>
+      store.saveMarkdownSource(page.id, {
+        revision: page.revision,
+        markdown: '# 旧版本提交',
+      }),
+    /Revision conflict/,
+  );
+});
+
 test('rescans watch directory and upserts HTML files', async (t) => {
   const { store, db, dataDir, watchDir } = await createStore();
   t.after(() => db.close());
@@ -808,6 +858,7 @@ test('builds a public page list with type filters and public-only fields', async
   assert.equal(html.pages.length, 1);
   assert.equal(html.pages[0].fileType, 'html');
   assert.equal(Object.hasOwn(html.pages[0], 'accessCount'), false);
+  assert.equal(Object.hasOwn(html.pages[0], 'downloadCount'), false);
 
   const pdf = store.listPublicPagesPage({ type: 'pdf' });
   assert.equal(pdf.pages.length, 1);
@@ -855,7 +906,7 @@ test('stores the public homepage setting with an enabled default', async (t) => 
   assert.equal(store.getSettings().publicHomepageEnabled, true);
 });
 
-test('tracks page access count for generated HTML views', async (t) => {
+test('tracks page access and download counts for generated HTML views', async (t) => {
   const { store, db, dataDir } = await createStore();
   t.after(() => db.close());
   t.after(() => fs.rm(dataDir, { recursive: true, force: true }));
@@ -867,9 +918,13 @@ test('tracks page access count for generated HTML views', async (t) => {
   });
 
   assert.equal(page.accessCount, 0);
+  assert.equal(page.downloadCount, 0);
   assert.equal(store.incrementAccessCount(page.id).accessCount, 1);
   assert.equal(store.incrementAccessCount(page.id).accessCount, 2);
   assert.equal(store.getPage(page.id).accessCount, 2);
+  assert.equal(store.incrementDownloadCount(page.id).downloadCount, 1);
+  assert.equal(store.incrementDownloadCount(page.id).downloadCount, 2);
+  assert.equal(store.getPage(page.id).downloadCount, 2);
 });
 
 test('moves deleted pages into an inaccessible recycle bin and restores them', async (t) => {

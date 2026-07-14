@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import vm from 'node:vm';
 import { parseHTML } from 'linkedom';
 import { buildManagedSlug, removeEditBridge } from '../src/html.js';
 import { editableElementSelector, injectEditBridge, movableModuleSelector } from '../src/edit-bridge.js';
@@ -47,7 +48,7 @@ test('movableModuleSelector covers common layout modules', () => {
 
 test('injectEditBridge uses a structured kami-style floating toolbar', () => {
   const html = injectEditBridge(
-    { id: 'page-1', slug: 'f812c6', revision: 1 },
+    { id: 'page-1', slug: 'f812c6', revision: 1, fileType: 'html' },
     '<!doctype html><html><head><title>页面</title></head><body><h1>页面</h1></body></html>',
     '/ops-console',
   );
@@ -75,11 +76,42 @@ test('injectEditBridge uses a structured kami-style floating toolbar', () => {
   assert.doesNotMatch(html, /data-tokdoc-drag-handle/);
   assert.doesNotMatch(html, /event\.altKey/);
   assert.doesNotMatch(html, /Alt\/Option/);
+  assert.match(html, /const isMarkdownPage = false/);
   assert.match(html, /href="\/f812c6"/);
   assert.match(html, /href="\/ops-console"/);
   assert.match(html, /\/ops-console\/api\/pages\/page-1\/content/);
   assert.doesNotMatch(html, /href="\/">管理器/);
   assert.doesNotMatch(html, /href="\/pages\/f812c6\.html"/);
+});
+
+test('injectEditBridge adds Markdown editor mode for Markdown pages', () => {
+  const html = injectEditBridge(
+    { id: 'markdown-1', slug: 'm812c6', revision: 2, fileType: 'markdown' },
+    '<!doctype html><html><head><title>Markdown</title></head><body><main><h1>Markdown</h1></main></body></html>',
+    '/ops-console',
+  );
+
+  assert.match(html, /编辑器修改/);
+  assert.match(html, /tokdoc-edit-panel--markdown/);
+  assert.match(html, /tokdoc-source-editor/);
+  assert.match(html, /data-tokdoc-source-input/);
+  assert.match(html, /data-tokdoc-md-format="bold"/);
+  assert.match(html, /data-tokdoc-md-format="table"/);
+  assert.match(html, /data-tokdoc-source-view="preview"/);
+  assert.match(html, /data-tokdoc-source-view="split"/);
+  assert.match(html, /data-tokdoc-source-preview/);
+  assert.match(html, /data-tokdoc-source-save/);
+  assert.match(html, /\/ops-console\/api\/pages\/markdown-1\/source/);
+  assert.match(html, /saveMarkdownSourceNow/);
+  assert.match(html, /renderMarkdownPreview/);
+  assert.match(html, /applyMarkdownFormat/);
+  assert.match(html, /openMarkdownSourceEditor\(\)/);
+  assert.match(html, /sourceOutOfSync/);
+  assert.match(html, /window\.location\.href = '\/m812c6\?edit=1'/);
+
+  const script = html.match(/<script data-tokdoc-bridge="script">([\s\S]*?)<\/script>/)?.[1] || '';
+  assert.ok(script.includes('renderMarkdownPreview'));
+  assert.doesNotThrow(() => new vm.Script(script));
 });
 
 test('removeEditBridge strips drag sorting runtime markers before saving', () => {

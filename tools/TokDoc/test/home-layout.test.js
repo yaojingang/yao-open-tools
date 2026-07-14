@@ -80,9 +80,13 @@ test('exposes document upload affordances in the manager UI', async () => {
   assert.match(html, /上传完成后确认名称，确认后写入列表和数据库/);
   assert.match(html, /文档列表/);
   assert.match(html, /<th>类型<\/th>/);
+  assert.match(html, /<th>下载数<\/th>/);
+  assert.match(html, /<th>访问数<\/th>/);
+  assert.doesNotMatch(html, /<th>访问次数<\/th>/);
   assert.match(html, /<th>可见性<\/th>/);
-  assert.match(html, /\.col-type\s*\{\s*width:\s*106px;/);
-  assert.match(html, /\.col-time\s*\{\s*width:\s*104px;/);
+  assert.match(html, /\.col-type\s*\{\s*width:\s*96px;/);
+  assert.match(html, /\.col-time\s*\{\s*width:\s*92px;/);
+  assert.match(html, /\.col-download\s*\{\s*width:\s*64px;/);
   assert.match(html, /\.type-cell\s*\{/);
   assert.match(html, /id="metaFileType"/);
   assert.match(html, /id="metaVisibility"/);
@@ -135,6 +139,9 @@ test('stages uploads with progress before confirming them into the page list', a
   assert.match(script, /uploadReviewDocuments/);
   assert.match(script, /data-upload-field="visibility"/);
   assert.match(script, /data-action="visibility"/);
+  assert.match(script, /data-action="download"/);
+  assert.match(script, /downloadCount/);
+  assert.match(script, /\/api\/pages\/.*\/download/);
   assert.match(script, /typeTabs:\s*document\.querySelector\('#typeTabs'\)/);
   assert.match(script, /function renderTypeTabs\(\)/);
   assert.match(script, /querySelectorAll\('\[data-type\]'\)/);

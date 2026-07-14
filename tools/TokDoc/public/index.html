@@ -761,7 +761,7 @@
 
       table {
         width: 100%;
-        min-width: 980px;
+        min-width: 1040px;
         border-collapse: collapse;
         table-layout: fixed;
       }
@@ -775,35 +775,39 @@
       }
 
       .col-type {
-        width: 106px;
-      }
-
-      .col-time {
-        width: 104px;
-      }
-
-      .col-size {
-        width: 82px;
-      }
-
-      .col-directory {
         width: 96px;
       }
 
-      .col-access {
-        width: 70px;
-      }
-
-      .col-visibility {
-        width: 78px;
-      }
-
-      .col-status {
+      .col-time {
         width: 92px;
       }
 
+      .col-size {
+        width: 70px;
+      }
+
+      .col-directory {
+        width: 86px;
+      }
+
+      .col-download {
+        width: 64px;
+      }
+
+      .col-access {
+        width: 64px;
+      }
+
+      .col-visibility {
+        width: 72px;
+      }
+
+      .col-status {
+        width: 86px;
+      }
+
       .col-actions {
-        width: 188px;
+        width: 190px;
       }
 
       th,
@@ -939,6 +943,7 @@
       .title-meta,
       .size-cell,
       .directory-cell,
+      .download-cell,
       .access-cell {
         display: block;
         margin-top: 3px;
@@ -1029,7 +1034,7 @@
         display: flex;
         align-items: center;
         justify-content: flex-start;
-        gap: 3px;
+        gap: 2px;
         min-width: 0;
         white-space: nowrap;
       }
@@ -1040,15 +1045,15 @@
       }
 
       .actions .icon-btn {
-        width: 26px;
-        min-width: 26px;
+        width: 24px;
+        min-width: 24px;
         height: 28px;
         border-radius: 7px;
       }
 
       .actions .icon-btn svg {
-        width: 15px;
-        height: 15px;
+        width: 14px;
+        height: 14px;
       }
 
       .inspector {
@@ -2136,6 +2141,7 @@
                   <col class="col-time" />
                   <col class="col-size" />
                   <col class="col-directory" />
+                  <col class="col-download" />
                   <col class="col-access" />
                   <col class="col-visibility" />
                   <col class="col-status" />
@@ -2149,7 +2155,8 @@
                     <th>上传时间</th>
                     <th>大小</th>
                     <th>目录名称</th>
-                    <th>访问次数</th>
+                    <th>下载数</th>
+                    <th>访问数</th>
                     <th>可见性</th>
                     <th>状态</th>
                     <th>操作</th>

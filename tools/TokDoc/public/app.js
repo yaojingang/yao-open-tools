@@ -9,6 +9,8 @@ const icons = {
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>',
   external:
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>',
+  download:
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>',
   trash:
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path></svg>',
   restore:
@@ -277,6 +279,19 @@ function findPage(id) {
   return pages.find((page) => page.id === id);
 }
 
+function filenameFromDisposition(value) {
+  const header = String(value || '');
+  const encoded = header.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded);
+    } catch {
+      return encoded;
+    }
+  }
+  return header.match(/filename="([^"]+)"/i)?.[1] || '';
+}
+
 function scrollingElement() {
   return document.scrollingElement || document.documentElement;
 }
@@ -489,6 +504,7 @@ function render() {
         : `<button class="btn icon-btn" type="button" title="${isEditablePage(page) ? '预览' : '阅读'}" aria-label="${isEditablePage(page) ? '预览' : '阅读'}" data-action="preview" data-id="${page.id}">${icons.eye}</button>
             ${editButton}
             <button class="btn icon-btn" type="button" title="复制 URL" aria-label="复制 URL" data-action="copy" data-id="${page.id}">${icons.copy}</button>
+            <button class="btn icon-btn" type="button" title="下载文件" aria-label="下载文件" data-action="download" data-id="${page.id}">${icons.download}</button>
             <button class="btn icon-btn" type="button" title="新窗口打开" aria-label="新窗口打开" data-action="open" data-id="${page.id}">${icons.external}</button>
             ${syncButton}
             <button class="btn icon-btn" type="button" title="移入回收站" aria-label="移入回收站" data-action="delete" data-id="${page.id}">${icons.trash}</button>`;
@@ -504,6 +520,7 @@ function render() {
         <td class="time-cell">${escapeHtml(page.uploadTime || page.updatedTime || '-')}</td>
         <td><span class="size-cell">${escapeHtml(formatSize(page.size))}</span></td>
         <td><span class="directory-cell" title="${escapeHtml(page.directoryName || '无目录')}">${escapeHtml(page.directoryName || '-')}</span></td>
+        <td><span class="download-cell">${Number(page.downloadCount || 0)}</span></td>
         <td><span class="access-cell">${Number(page.accessCount || 0)}</span></td>
         <td>
           ${
@@ -524,7 +541,7 @@ function render() {
 
   if (!pages.length) {
     const emptyText = activeFilter === 'trash' ? '回收站为空' : '暂无匹配页面';
-    els.rows.innerHTML = `<tr><td colspan="10" style="height:120px;text-align:center;color:var(--muted)">${emptyText}</td></tr>`;
+    els.rows.innerHTML = `<tr><td colspan="11" style="height:120px;text-align:center;color:var(--muted)">${emptyText}</td></tr>`;
   }
 
   renderPagination();
@@ -845,6 +862,30 @@ function openGenerated(id) {
   window.open(pageUrl(page), '_blank', 'noopener,noreferrer');
 }
 
+async function downloadPage(id) {
+  const page = findPage(id);
+  if (!page) return;
+  const response = await fetch(apiUrl(`/api/pages/${encodeURIComponent(id)}/download`), { credentials: 'same-origin' });
+  if (!response.ok) {
+    if (response.status === 401) showLogin();
+    throw new Error(`下载失败：${response.status}`);
+  }
+  const blob = await response.blob();
+  const href = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = href;
+  link.download = filenameFromDisposition(response.headers.get('content-disposition')) || page.fileName || page.slug || 'document';
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(href), 1000);
+  pages = pages.map((item) =>
+    item.id === id ? { ...item, downloadCount: Number(item.downloadCount || 0) + 1 } : item,
+  );
+  render();
+  showToast('已开始下载');
+}
+
 async function deletePage(id) {
   await api(`/api/pages/${encodeURIComponent(id)}`, { method: 'DELETE' });
   await loadData();
@@ -1099,6 +1140,7 @@ els.rows.addEventListener('click', (event) => {
   if (action === 'preview') openPreview(id);
   if (action === 'edit') openEditor(id);
   if (action === 'copy') copyUrl(id);
+  if (action === 'download') downloadPage(id).catch((error) => showToast(error.message));
   if (action === 'open') openGenerated(id);
   if (action === 'delete') deletePage(id).catch((error) => showToast(error.message));
   if (action === 'restore') restorePage(id).catch((error) => showToast(error.message));

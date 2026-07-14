@@ -173,6 +173,11 @@ export function injectAssetBase(html, assetBaseUrl = '') {
   return `<head>\n${baseTag}\n</head>\n${cleanHtml}`;
 }
 
+export function extractAssetBaseUrl(html) {
+  const { document } = parseHTML(String(html || ''));
+  return document.querySelector('base[data-tokdoc-base],base[data-tokhtml-base]')?.getAttribute('href') || '';
+}
+
 export function stripTrackingCode(html) {
   return String(html || '').replace(/\s*<!-- tok(?:doc|html)-tracking:start -->[\s\S]*?<!-- tok(?:doc|html)-tracking:end -->\s*/gi, '\n');
 }

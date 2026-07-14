@@ -81,8 +81,15 @@ function bridgeScript(page, adminPath = '/admin') {
 (function () {
   const adminBase = ${JSON.stringify(adminBase)};
   const saveEndpoint = ${JSON.stringify(`${adminBase}/api/pages/${encodeURIComponent(page.id)}/content`)};
+  const sourceEndpoint = ${JSON.stringify(`${adminBase}/api/pages/${encodeURIComponent(page.id)}/source`)};
+  const isMarkdownPage = ${JSON.stringify(page.fileType === 'markdown')};
   let revision = ${Number(page.revision)};
+  let sourceRevision = revision;
   let saveTimer = null;
+  let sourceSaveTimer = null;
+  let sourceSaveInFlight = null;
+  let sourceDirty = false;
+  let sourceSaved = false;
   let freeDrag = null;
   let resizeDrag = null;
   let activeModule = null;
@@ -93,6 +100,13 @@ function bridgeScript(page, adminPath = '/admin') {
 
   function setStatus(text, tone) {
     const status = document.querySelector('[data-tokdoc-status]');
+    if (!status) return;
+    status.textContent = text;
+    status.dataset.tone = tone || 'idle';
+  }
+
+  function setSourceStatus(text, tone) {
+    const status = document.querySelector('[data-tokdoc-source-status]');
     if (!status) return;
     status.textContent = text;
     status.dataset.tone = tone || 'idle';
@@ -548,18 +562,373 @@ function bridgeScript(page, adminPath = '/admin') {
     saveTimer = window.setTimeout(() => saveNow(false), 600);
   }
 
+  function sourceEditor() {
+    return document.querySelector('[data-tokdoc-source-editor]');
+  }
+
+  function escapePreviewHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function safePreviewUrl(value) {
+    const url = String(value || '').trim();
+    if (!url) return '#';
+    if (/^(https?:|mailto:|tel:|\\/|\\.\\/|\\.\\.\\/|#)/i.test(url)) return escapePreviewHtml(url);
+    return '#';
+  }
+
+  function renderInlineMarkdown(value) {
+    let html = escapePreviewHtml(value);
+    html = html.replace(/!\\[([^\\]]*)\\]\\(([^)\\s]+)(?:\\s+"[^"]*")?\\)/g, (_, alt, url) => '<img src="' + safePreviewUrl(url) + '" alt="' + alt + '">');
+    html = html.replace(/\\[([^\\]]+)\\]\\(([^)\\s]+)(?:\\s+"[^"]*")?\\)/g, (_, label, url) => '<a href="' + safePreviewUrl(url) + '" target="_blank" rel="noopener noreferrer">' + label + '</a>');
+    html = html.replace(/\\x60([^\\x60]+)\\x60/g, '<code>$1</code>');
+    html = html.replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>');
+    html = html.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+    html = html.replace(/(^|[^\\*])\\*([^*]+)\\*/g, '$1<em>$2</em>');
+    html = html.replace(/(^|[^_])_([^_]+)_/g, '$1<em>$2</em>');
+    return html;
+  }
+
+  function renderMarkdownTable(lines, startIndex) {
+    const header = lines[startIndex] || '';
+    const divider = lines[startIndex + 1] || '';
+    if (!/^\\s*\\|?[\\s:|-]+\\|[\\s:| -]*$/.test(divider)) return null;
+    const parseRow = (line) => line.trim().replace(/^\\||\\|$/g, '').split('|').map((cell) => cell.trim());
+    const headers = parseRow(header);
+    const rows = [];
+    let index = startIndex + 2;
+    while (index < lines.length && /\\|/.test(lines[index] || '')) {
+      rows.push(parseRow(lines[index]));
+      index += 1;
+    }
+    if (!headers.length || !rows.length) return null;
+    const thead = '<thead><tr>' + headers.map((cell) => '<th>' + renderInlineMarkdown(cell) + '</th>').join('') + '</tr></thead>';
+    const tbody = '<tbody>' + rows.map((row) => '<tr>' + headers.map((_, cellIndex) => '<td>' + renderInlineMarkdown(row[cellIndex] || '') + '</td>').join('') + '</tr>').join('') + '</tbody>';
+    return { html: '<table>' + thead + tbody + '</table>', nextIndex: index };
+  }
+
+  function flushMarkdownList(buffer, ordered) {
+    if (!buffer.length) return '';
+    const tag = ordered ? 'ol' : 'ul';
+    const body = buffer.map((item) => '<li>' + renderInlineMarkdown(item) + '</li>').join('');
+    buffer.length = 0;
+    return '<' + tag + '>' + body + '</' + tag + '>';
+  }
+
+  function renderMarkdownPreview(markdown) {
+    const lines = String(markdown || '').replace(/^\\uFEFF/, '').split(/\\r?\\n/);
+    let html = '';
+    let paragraph = [];
+    let unorderedList = [];
+    let orderedList = [];
+    let inCode = false;
+    let codeLines = [];
+    const flushParagraph = () => {
+      if (!paragraph.length) return;
+      html += '<p>' + renderInlineMarkdown(paragraph.join(' ')) + '</p>';
+      paragraph = [];
+    };
+    const flushLists = () => {
+      html += flushMarkdownList(unorderedList, false);
+      html += flushMarkdownList(orderedList, true);
+    };
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index];
+      if (/^\\s*\\x60\\x60\\x60/.test(line)) {
+        if (inCode) {
+          html += '<pre><code>' + escapePreviewHtml(codeLines.join('\\n')) + '</code></pre>';
+          codeLines = [];
+          inCode = false;
+        } else {
+          flushParagraph();
+          flushLists();
+          inCode = true;
+        }
+        continue;
+      }
+      if (inCode) {
+        codeLines.push(line);
+        continue;
+      }
+      if (!line.trim()) {
+        flushParagraph();
+        flushLists();
+        continue;
+      }
+      const table = /\\|/.test(line) ? renderMarkdownTable(lines, index) : null;
+      if (table) {
+        flushParagraph();
+        flushLists();
+        html += table.html;
+        index = table.nextIndex - 1;
+        continue;
+      }
+      const heading = line.match(/^\\s{0,3}(#{1,6})\\s+(.+?)\\s*#*\\s*$/);
+      if (heading) {
+        flushParagraph();
+        flushLists();
+        html += '<h' + heading[1].length + '>' + renderInlineMarkdown(heading[2]) + '</h' + heading[1].length + '>';
+        continue;
+      }
+      const quote = line.match(/^\\s{0,3}>\\s?(.*)$/);
+      if (quote) {
+        flushParagraph();
+        flushLists();
+        html += '<blockquote>' + renderInlineMarkdown(quote[1]) + '</blockquote>';
+        continue;
+      }
+      const unordered = line.match(/^\\s*[-*+]\\s+(.+)$/);
+      if (unordered) {
+        flushParagraph();
+        html += flushMarkdownList(orderedList, true);
+        unorderedList.push(unordered[1]);
+        continue;
+      }
+      const ordered = line.match(/^\\s*\\d+\\.\\s+(.+)$/);
+      if (ordered) {
+        flushParagraph();
+        html += flushMarkdownList(unorderedList, false);
+        orderedList.push(ordered[1]);
+        continue;
+      }
+      paragraph.push(line.trim());
+    }
+    if (inCode) html += '<pre><code>' + escapePreviewHtml(codeLines.join('\\n')) + '</code></pre>';
+    flushParagraph();
+    flushLists();
+    return html || '<p class="tokdoc-source-preview__empty">暂无预览内容</p>';
+  }
+
+  function updateMarkdownPreview() {
+    const panel = sourceEditor();
+    if (!panel) return;
+    const input = panel.querySelector('[data-tokdoc-source-input]');
+    const preview = panel.querySelector('[data-tokdoc-source-preview]');
+    if (!input || !preview) return;
+    preview.innerHTML = renderMarkdownPreview(input.value);
+  }
+
+  function setSourceViewMode(mode) {
+    const panel = mountSourceEditor();
+    const normalized = ['edit', 'preview', 'split'].includes(mode) ? mode : 'edit';
+    panel.dataset.viewMode = normalized;
+    panel.querySelectorAll('[data-tokdoc-source-view]').forEach((button) => {
+      button.dataset.active = button.dataset.tokdocSourceView === normalized ? 'true' : 'false';
+    });
+    if (normalized !== 'edit') updateMarkdownPreview();
+  }
+
+  function replaceMarkdownSelection(input, before, after, placeholder) {
+    const start = input.selectionStart ?? 0;
+    const end = input.selectionEnd ?? start;
+    const selected = input.value.slice(start, end) || placeholder;
+    const next = before + selected + after;
+    input.setRangeText(next, start, end, 'select');
+    input.selectionStart = start + before.length;
+    input.selectionEnd = start + before.length + selected.length;
+    input.focus();
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  function replaceCurrentLines(input, transform) {
+    const value = input.value;
+    const start = input.selectionStart ?? 0;
+    const end = input.selectionEnd ?? start;
+    const lineStart = value.lastIndexOf('\\n', Math.max(0, start - 1)) + 1;
+    const lineEndIndex = value.indexOf('\\n', end);
+    const lineEnd = lineEndIndex === -1 ? value.length : lineEndIndex;
+    const block = value.slice(lineStart, lineEnd) || '';
+    const next = transform(block);
+    input.setRangeText(next, lineStart, lineEnd, 'select');
+    input.selectionStart = lineStart;
+    input.selectionEnd = lineStart + next.length;
+    input.focus();
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  function applyMarkdownFormat(action) {
+    const panel = mountSourceEditor();
+    const input = panel.querySelector('[data-tokdoc-source-input]');
+    if (!input) return;
+    const lineTransform = (prefix, fallback) => replaceCurrentLines(input, (block) => {
+      const lines = (block || fallback).split('\\n');
+      return lines.map((line) => {
+        const clean = line.replace(/^\\s{0,3}(#{1,6}\\s+|>\\s+|[-*+]\\s+|\\d+\\.\\s+)/, '');
+        return prefix + clean;
+      }).join('\\n');
+    });
+    if (action === 'h1') lineTransform('# ', '标题');
+    if (action === 'h2') lineTransform('## ', '小标题');
+    if (action === 'bold') replaceMarkdownSelection(input, '**', '**', '加粗文字');
+    if (action === 'italic') replaceMarkdownSelection(input, '*', '*', '斜体文字');
+    if (action === 'quote') lineTransform('> ', '引用内容');
+    if (action === 'ul') lineTransform('- ', '列表项');
+    if (action === 'ol') replaceCurrentLines(input, (block) => (block || '列表项').split('\\n').map((line, index) => (index + 1) + '. ' + line.replace(/^\\s*(\\d+\\.\\s+|[-*+]\\s+)/, '')).join('\\n'));
+    if (action === 'code') replaceMarkdownSelection(input, '\\x60', '\\x60', 'code');
+    if (action === 'codeblock') replaceMarkdownSelection(input, '\\x60\\x60\\x60\\n', '\\n\\x60\\x60\\x60', '代码内容');
+    if (action === 'link') replaceMarkdownSelection(input, '[', '](https://example.com)', '链接文字');
+    if (action === 'table') replaceMarkdownSelection(input, '', '', '| 字段 | 说明 |\\n| --- | --- |\\n| 示例 | 内容 |');
+    updateMarkdownPreview();
+  }
+
+  function mountSourceEditor() {
+    let panel = sourceEditor();
+    if (panel) return panel;
+    panel = document.createElement('section');
+    panel.hidden = true;
+    panel.className = 'tokdoc-source-editor';
+    panel.setAttribute('data-tokdoc-bridge', 'source-editor');
+    panel.setAttribute('data-tokdoc-source-editor', 'true');
+    panel.setAttribute('aria-label', 'Markdown 编辑器修改');
+    panel.dataset.viewMode = 'edit';
+    panel.innerHTML = '<header class="tokdoc-source-editor__bar"><div class="tokdoc-source-editor__title"><strong>Markdown 编辑器</strong><span>直接修改源码，支持工具栏和实时预览</span></div><span class="tokdoc-edit-panel__status" data-tokdoc-source-status data-tone="saved">等待载入</span><div class="tokdoc-source-editor__actions"><button type="button" data-tokdoc-source-save>保存源码</button><button type="button" data-tokdoc-source-close>回到页面修改</button></div></header><div class="tokdoc-source-editor__tools" aria-label="Markdown 工具栏"><div class="tokdoc-source-editor__toolset"><button type="button" data-tokdoc-md-format="h1">H1</button><button type="button" data-tokdoc-md-format="h2">H2</button><button type="button" data-tokdoc-md-format="bold">B</button><button type="button" data-tokdoc-md-format="italic"><em>I</em></button><button type="button" data-tokdoc-md-format="quote">引用</button><button type="button" data-tokdoc-md-format="ul">列表</button><button type="button" data-tokdoc-md-format="ol">编号</button><button type="button" data-tokdoc-md-format="code">代码</button><button type="button" data-tokdoc-md-format="codeblock">代码块</button><button type="button" data-tokdoc-md-format="link">链接</button><button type="button" data-tokdoc-md-format="table">表格</button></div><div class="tokdoc-source-editor__views" aria-label="预览模式"><button type="button" data-tokdoc-source-view="edit" data-active="true">编辑</button><button type="button" data-tokdoc-source-view="preview" data-active="false">预览</button><button type="button" data-tokdoc-source-view="split" data-active="false">分栏</button></div></div><div class="tokdoc-source-editor__body"><div class="tokdoc-source-editor__pane tokdoc-source-editor__pane--edit"><textarea data-tokdoc-source-input spellcheck="false" aria-label="Markdown 源码"></textarea></div><div class="tokdoc-source-editor__pane tokdoc-source-editor__pane--preview"><div class="tokdoc-source-preview" data-tokdoc-source-preview aria-label="Markdown 实时预览"></div></div><p class="tokdoc-source-editor__note" data-tokdoc-source-note hidden>当前页面做过页面内编辑，源码保存后会以 Markdown 内容重新生成页面。</p></div>';
+    document.body.append(panel);
+    panel.querySelector('[data-tokdoc-source-save]').addEventListener('click', () => saveMarkdownSourceNow(true));
+    panel.querySelector('[data-tokdoc-source-close]').addEventListener('click', () => closeMarkdownSourceEditor());
+    panel.querySelectorAll('[data-tokdoc-md-format]').forEach((button) => {
+      button.addEventListener('click', () => applyMarkdownFormat(button.dataset.tokdocMdFormat));
+    });
+    panel.querySelectorAll('[data-tokdoc-source-view]').forEach((button) => {
+      button.addEventListener('click', () => setSourceViewMode(button.dataset.tokdocSourceView));
+    });
+    panel.querySelector('[data-tokdoc-source-input]').addEventListener('input', () => {
+      sourceDirty = true;
+      updateMarkdownPreview();
+      scheduleMarkdownSourceSave();
+    });
+    panel.querySelector('[data-tokdoc-source-input]').addEventListener('scroll', (event) => {
+      const preview = panel.querySelector('[data-tokdoc-source-preview]');
+      if (!preview) return;
+      const input = event.currentTarget;
+      const ratio = input.scrollTop / Math.max(1, input.scrollHeight - input.clientHeight);
+      preview.scrollTop = ratio * Math.max(0, preview.scrollHeight - preview.clientHeight);
+    });
+    return panel;
+  }
+
+  async function loadMarkdownSource() {
+    const panel = mountSourceEditor();
+    const input = panel.querySelector('[data-tokdoc-source-input]');
+    const note = panel.querySelector('[data-tokdoc-source-note]');
+    setSourceStatus('读取中', 'saving');
+    const response = await fetch(sourceEndpoint);
+    if (!response.ok) {
+      setSourceStatus('源码读取失败', 'error');
+      return false;
+    }
+    const data = await response.json();
+    input.value = data.markdown || '';
+    sourceRevision = data.page.revision;
+    revision = data.page.revision;
+    sourceDirty = false;
+    sourceSaved = false;
+    panel.dataset.loaded = 'true';
+    note.hidden = !data.sourceOutOfSync;
+    updateMarkdownPreview();
+    setSourceStatus('已载入', 'saved');
+    return true;
+  }
+
+  async function saveMarkdownSourceNow(manual) {
+    window.clearTimeout(sourceSaveTimer);
+    if (sourceSaveInFlight) {
+      const previousSaved = await sourceSaveInFlight;
+      if (!previousSaved || !sourceDirty) return previousSaved;
+    }
+    const saveTask = saveMarkdownSourcePayload(manual);
+    sourceSaveInFlight = saveTask;
+    try {
+      return await saveTask;
+    } finally {
+      if (sourceSaveInFlight === saveTask) sourceSaveInFlight = null;
+    }
+  }
+
+  async function saveMarkdownSourcePayload(manual) {
+    const panel = mountSourceEditor();
+    const input = panel.querySelector('[data-tokdoc-source-input]');
+    const nextMarkdown = input.value;
+    setSourceStatus('保存中', 'saving');
+    const response = await fetch(sourceEndpoint, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ markdown: nextMarkdown, revision: sourceRevision, reason: manual ? 'manual-source' : 'autosave-source' }),
+    });
+    if (response.status === 409) {
+      setSourceStatus('版本冲突，刷新后再改', 'error');
+      return false;
+    }
+    if (!response.ok) {
+      setSourceStatus('源码保存失败', 'error');
+      return false;
+    }
+    const data = await response.json();
+    sourceRevision = data.page.revision;
+    revision = data.page.revision;
+    sourceDirty = input.value !== nextMarkdown;
+    sourceSaved = true;
+    const note = panel.querySelector('[data-tokdoc-source-note]');
+    if (note) note.hidden = true;
+    setSourceStatus('已保存 ' + new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }), 'saved');
+    if (sourceDirty) scheduleMarkdownSourceSave();
+    return true;
+  }
+
+  function scheduleMarkdownSourceSave() {
+    setSourceStatus('保存中', 'saving');
+    window.clearTimeout(sourceSaveTimer);
+    sourceSaveTimer = window.setTimeout(() => saveMarkdownSourceNow(false), 900);
+  }
+
+  async function openMarkdownSourceEditor() {
+    if (!isMarkdownPage) return;
+    const panel = mountSourceEditor();
+    panel.hidden = false;
+    document.body.classList.add('tokdoc-source-open');
+    if (panel.dataset.loaded !== 'true') {
+      await loadMarkdownSource();
+    }
+    panel.querySelector('[data-tokdoc-source-input]').focus();
+  }
+
+  async function closeMarkdownSourceEditor() {
+    const panel = sourceEditor();
+    if (!panel) return;
+    if (sourceDirty) {
+      const saved = await saveMarkdownSourceNow(true);
+      if (!saved) return;
+    }
+    if (sourceSaved) {
+      window.location.href = '/${escapeHtml(page.slug)}?edit=1';
+      return;
+    }
+    panel.hidden = true;
+    document.body.classList.remove('tokdoc-source-open');
+  }
+
   function mountToolbar() {
     const toolbar = document.createElement('div');
-    toolbar.className = 'tokdoc-edit-panel';
+    toolbar.className = 'tokdoc-edit-panel' + (isMarkdownPage ? ' tokdoc-edit-panel--markdown' : '');
     toolbar.setAttribute('data-tokdoc-bridge', 'toolbar');
-    toolbar.innerHTML = '<div class="tokdoc-edit-panel__brand"><strong>TokDoc</strong><span>页面内编辑</span></div><span class="tokdoc-edit-panel__status" data-tokdoc-status data-tone="saved">已保存</span><div class="tokdoc-edit-panel__actions"><button type="button" data-tokdoc-save>保存</button><a href="/${escapeHtml(page.slug)}">退出编辑</a><a href="${escapeHtml(adminBase)}">管理器</a></div>';
+    const sourceButton = isMarkdownPage ? '<button type="button" data-tokdoc-source>编辑器修改</button>' : '';
+    toolbar.innerHTML = '<div class="tokdoc-edit-panel__brand"><strong>TokDoc</strong><span>页面内编辑</span></div><span class="tokdoc-edit-panel__status" data-tokdoc-status data-tone="saved">已保存</span><div class="tokdoc-edit-panel__actions"><button type="button" data-tokdoc-save>保存</button>' + sourceButton + '<a href="/${escapeHtml(page.slug)}">退出编辑</a><a href="${escapeHtml(adminBase)}">管理器</a></div>';
     document.body.append(toolbar);
     toolbar.querySelector('[data-tokdoc-save]').addEventListener('click', () => saveNow(true));
+    const sourceTrigger = toolbar.querySelector('[data-tokdoc-source]');
+    if (sourceTrigger) sourceTrigger.addEventListener('click', () => openMarkdownSourceEditor());
   }
 
   mountToolbar();
   mountModuleHandle();
   enableEditing();
+  if (isMarkdownPage) {
+    window.setTimeout(() => openMarkdownSourceEditor(), 0);
+  }
   document.addEventListener('pointermove', handleModuleHover);
   document.addEventListener('pointermove', handleFreeDragMove);
   document.addEventListener('pointermove', handleResizeMove);
@@ -588,9 +957,48 @@ export function injectEditBridge(page, html, adminPath = '/admin') {
   .tokdoc-edit-panel__status[data-tone="saving"]{background:#f4ead8;color:#805a23}
   .tokdoc-edit-panel__status[data-tone="error"]{background:#f3e1dc;color:#9f3430}
   .tokdoc-edit-panel__actions{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .tokdoc-edit-panel--markdown .tokdoc-edit-panel__actions{grid-template-columns:repeat(4,minmax(0,1fr))}
   .tokdoc-edit-panel__actions button,.tokdoc-edit-panel__actions a{display:inline-flex;align-items:center;justify-content:center;height:34px;min-width:0;padding:0 10px;border:1px solid #e8e5da;border-radius:7px;background:#fffefa;color:#1B365D;text-decoration:none;cursor:pointer;font:600 13px/1 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;white-space:nowrap}
   .tokdoc-edit-panel__actions button:hover,.tokdoc-edit-panel__actions a:hover{border-color:#d1cfc5;background:#f2f0e7}
-  @media (max-width:520px){.tokdoc-edit-panel{right:12px;bottom:12px;width:calc(100vw - 24px)}.tokdoc-edit-panel__actions{grid-template-columns:1fr}.tokdoc-edit-panel__actions button,.tokdoc-edit-panel__actions a{height:36px}}
+  body.tokdoc-source-open{overflow:hidden}
+  .tokdoc-source-editor,.tokdoc-source-editor *{box-sizing:border-box}
+  .tokdoc-source-editor{position:fixed;inset:0;z-index:2147483647;display:grid;grid-template-rows:auto auto minmax(0,1fr);background:#f7f6ef;color:#141413;font:14px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+  .tokdoc-source-editor[hidden]{display:none}
+  .tokdoc-source-editor__bar{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:14px;padding:18px 22px;border-bottom:1px solid #e5dfd2;background:#fffefa;box-shadow:0 1px 0 rgba(255,255,255,.72)}
+  .tokdoc-source-editor__title{min-width:0;padding-left:12px;border-left:3px solid #1B365D}
+  .tokdoc-source-editor__title strong{display:block;color:#1B365D;font-family:"Songti SC","STSong",Georgia,serif;font-size:22px;font-weight:600;line-height:1.15}
+  .tokdoc-source-editor__title span{display:block;margin-top:5px;color:#66645f;font-size:13px;line-height:1.35}
+  .tokdoc-source-editor__actions{display:flex;align-items:center;gap:8px}
+  .tokdoc-source-editor__actions button{height:36px;padding:0 14px;border:1px solid #e8e5da;border-radius:7px;background:#fffefa;color:#1B365D;cursor:pointer;font:700 13px/1 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;white-space:nowrap}
+  .tokdoc-source-editor__actions button:first-child{border-color:#1B365D;background:#1B365D;color:#fff}
+  .tokdoc-source-editor__actions button:hover{border-color:#d1cfc5;background:#f2f0e7;color:#1B365D}
+  .tokdoc-source-editor__actions button:first-child:hover{border-color:#132a49;background:#132a49;color:#fff}
+  .tokdoc-source-editor__tools{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 22px;border-bottom:1px solid #e8e2d6;background:#faf9f4}
+  .tokdoc-source-editor__toolset,.tokdoc-source-editor__views{display:flex;align-items:center;gap:6px;min-width:0}
+  .tokdoc-source-editor__toolset{flex-wrap:wrap}
+  .tokdoc-source-editor__views{justify-self:end;padding:4px;border-radius:8px;background:#ebe8dd}
+  .tokdoc-source-editor__toolset button,.tokdoc-source-editor__views button{display:inline-flex;align-items:center;justify-content:center;height:32px;min-width:34px;padding:0 10px;border:1px solid #e3ded2;border-radius:7px;background:#fffefa;color:#44413b;cursor:pointer;font:700 12px/1 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;white-space:nowrap}
+  .tokdoc-source-editor__toolset button:hover,.tokdoc-source-editor__views button:hover{border-color:#cfc8b8;background:#f3f0e7;color:#1B365D}
+  .tokdoc-source-editor__views button{border-color:transparent;background:transparent;color:#615f59}
+  .tokdoc-source-editor__views button[data-active="true"]{border-color:#e8e3d8;background:#fffefa;color:#1B365D;box-shadow:0 1px 2px rgba(41,34,20,.08)}
+  .tokdoc-source-editor__body{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;min-height:0;padding:18px 22px 44px}
+  .tokdoc-source-editor[data-view-mode="edit"] .tokdoc-source-editor__body,.tokdoc-source-editor[data-view-mode="preview"] .tokdoc-source-editor__body{grid-template-columns:minmax(0,1fr)}
+  .tokdoc-source-editor[data-view-mode="edit"] .tokdoc-source-editor__pane--preview,.tokdoc-source-editor[data-view-mode="preview"] .tokdoc-source-editor__pane--edit{display:none}
+  .tokdoc-source-editor__pane{min-width:0;min-height:0}
+  .tokdoc-source-editor textarea{width:100%;height:100%;min-height:0;resize:none;padding:22px;border:1px solid #d8d2c3;border-radius:8px;background:#fffefa;color:#252522;box-shadow:0 14px 34px rgba(41,34,20,.08);font:14px/1.72 "SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;tab-size:2;outline:none}
+  .tokdoc-source-editor textarea:focus{border-color:#1B365D;box-shadow:0 0 0 3px rgba(27,54,93,.12),0 14px 34px rgba(41,34,20,.08)}
+  .tokdoc-source-preview{height:100%;overflow:auto;padding:28px 34px;border:1px solid #e0dacd;border-radius:8px;background:#fffefa;color:#3f3f3b;box-shadow:0 14px 34px rgba(41,34,20,.08);font:15px/1.72 -apple-system,BlinkMacSystemFont,"Source Han Sans SC","PingFang SC",sans-serif}
+  .tokdoc-source-preview h1,.tokdoc-source-preview h2,.tokdoc-source-preview h3,.tokdoc-source-preview h4,.tokdoc-source-preview h5,.tokdoc-source-preview h6{color:#141413;font-family:"Songti SC","STSong",Georgia,serif;font-weight:500;line-height:1.24;margin:1.35em 0 .55em}
+  .tokdoc-source-preview h1{margin-top:0;font-size:32px}.tokdoc-source-preview h2{font-size:24px;border-bottom:1px solid #eee8dc;padding-bottom:9px}.tokdoc-source-preview h3{font-size:20px}
+  .tokdoc-source-preview p,.tokdoc-source-preview ul,.tokdoc-source-preview ol,.tokdoc-source-preview blockquote,.tokdoc-source-preview pre,.tokdoc-source-preview table{margin:0 0 18px}
+  .tokdoc-source-preview a{color:#1B365D;text-underline-offset:3px}.tokdoc-source-preview img{max-width:100%;height:auto;border-radius:6px}.tokdoc-source-preview blockquote{padding:12px 18px;border-left:4px solid #1B365D;background:#f6f3eb;color:#55524b}
+  .tokdoc-source-preview code{font-family:"SFMono-Regular",Consolas,monospace;background:#f0ede4;border:1px solid #e3dccd;border-radius:4px;padding:1px 5px;font-size:.92em}.tokdoc-source-preview pre{overflow:auto;background:#171717;color:#f7f4ec;border-radius:6px;padding:18px}.tokdoc-source-preview pre code{background:transparent;border:0;color:inherit;padding:0}
+  .tokdoc-source-preview table{width:100%;border-collapse:collapse;font-size:14px}.tokdoc-source-preview th,.tokdoc-source-preview td{border:1px solid #e5dfd2;padding:9px 11px;text-align:left;vertical-align:top}.tokdoc-source-preview th{background:#f4f1e8;color:#222}
+  .tokdoc-source-preview__empty{color:#8b877e}
+  .tokdoc-source-editor__note{position:absolute;left:38px;right:38px;bottom:16px;margin:0;padding:8px 10px;border:1px solid #edd9b8;border-radius:7px;background:#fff8ea;color:#7c5520;font-size:12px;line-height:1.45}
+  .tokdoc-source-editor__note[hidden]{display:none}
+  @media (max-width:780px){.tokdoc-source-editor__tools{grid-template-columns:1fr}.tokdoc-source-editor__views{justify-self:stretch}.tokdoc-source-editor__views button{flex:1}.tokdoc-source-editor[data-view-mode="split"] .tokdoc-source-editor__body{grid-template-columns:1fr;grid-template-rows:minmax(220px,1fr) minmax(220px,1fr)}}
+  @media (max-width:520px){.tokdoc-edit-panel{right:12px;bottom:12px;width:calc(100vw - 24px)}.tokdoc-edit-panel__actions,.tokdoc-edit-panel--markdown .tokdoc-edit-panel__actions{grid-template-columns:1fr}.tokdoc-edit-panel__actions button,.tokdoc-edit-panel__actions a{height:36px}.tokdoc-source-editor__bar{grid-template-columns:1fr;align-items:start;padding:14px}.tokdoc-source-editor__actions{width:100%;display:grid;grid-template-columns:1fr 1fr}.tokdoc-source-editor__tools{padding:10px 12px}.tokdoc-source-editor__toolset{overflow:auto;flex-wrap:nowrap;padding-bottom:2px}.tokdoc-source-editor__body{padding:12px 12px 42px}.tokdoc-source-editor textarea{padding:16px;font-size:13px}.tokdoc-source-preview{padding:18px;font-size:14px}.tokdoc-source-editor__note{left:20px;right:20px;bottom:10px}}
   .tokdoc-editable{outline:1px dashed transparent;outline-offset:3px;transition:outline-color .15s ease,background .15s ease}
   .tokdoc-editable:hover{outline-color:#9db4d0;background:rgba(238,242,247,.55)}
   .tokdoc-editable:focus{outline:2px solid #1B365D;background:rgba(238,242,247,.85)}

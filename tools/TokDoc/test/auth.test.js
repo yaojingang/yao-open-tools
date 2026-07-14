@@ -520,6 +520,73 @@ test('allows public generated page views but protects edit mode', async (t) => {
   assert.match(editAllowed.body, /tokdoc/);
 });
 
+test('protects Markdown source editor API and regenerates the document', async (t) => {
+  const { app, dataDir } = await createApp();
+  t.after(async () => {
+    await app.close();
+    await fs.rm(dataDir, { recursive: true, force: true });
+  });
+
+  const markdownPage = await app.store.importBuffer({
+    fileName: 'source-edit.md',
+    relativePath: 'source-edit.md',
+    buffer: Buffer.from('# 源码编辑\n\n旧正文'),
+  });
+  const htmlPage = await app.store.importBuffer({
+    fileName: 'plain.html',
+    relativePath: 'plain.html',
+    buffer: Buffer.from('<!doctype html><html><head><title>HTML</title></head><body><h1>HTML</h1></body></html>'),
+  });
+
+  const denied = await app.inject({ method: 'GET', url: `/api/pages/${markdownPage.id}/source` });
+  assert.equal(denied.statusCode, 401);
+
+  const login = await app.inject({
+    method: 'POST',
+    url: '/api/login',
+    payload: { username: 'admin', password: 'tokdoc' },
+  });
+  const cookie = sessionCookie(login);
+  const source = await app.inject({ method: 'GET', url: `/api/pages/${markdownPage.id}/source`, headers: { cookie } });
+  assert.equal(source.statusCode, 200);
+  assert.equal(source.json().markdown, '# 源码编辑\n\n旧正文');
+  assert.equal(source.json().page.canEditMarkdownSource, true);
+
+  const saved = await app.inject({
+    method: 'PATCH',
+    url: `/api/pages/${markdownPage.id}/source`,
+    headers: { cookie },
+    payload: {
+      revision: markdownPage.revision,
+      markdown: '# 源码编辑新标题\n\n新的 **Markdown** 正文',
+    },
+  });
+  assert.equal(saved.statusCode, 200);
+  assert.equal(saved.json().page.title, '源码编辑新标题');
+  assert.equal(saved.json().page.revision, 2);
+
+  const rendered = await app.inject({ method: 'GET', url: markdownPage.url });
+  assert.equal(rendered.statusCode, 200);
+  assert.match(rendered.body, /源码编辑新标题/);
+  assert.match(rendered.body, /<strong>Markdown<\/strong>/);
+
+  const conflict = await app.inject({
+    method: 'PATCH',
+    url: `/api/pages/${markdownPage.id}/source`,
+    headers: { cookie },
+    payload: { revision: markdownPage.revision, markdown: '# 旧版本' },
+  });
+  assert.equal(conflict.statusCode, 409);
+
+  const htmlSource = await app.inject({
+    method: 'PATCH',
+    url: `/api/pages/${htmlPage.id}/source`,
+    headers: { cookie },
+    payload: { revision: htmlPage.revision, markdown: '# 不应保存' },
+  });
+  assert.equal(htmlSource.statusCode, 400);
+});
+
 test('hides private documents from the public frontend while allowing logged-in backend views', async (t) => {
   const { app, dataDir } = await createApp();
   t.after(async () => {
@@ -664,6 +731,17 @@ test('serves uploaded PDF documents publicly and blocks edit mode for non-HTML a
     url: '/api/login',
     payload: { username: 'admin', password: 'tokdoc' },
   });
+  const downloaded = await app.inject({
+    method: 'GET',
+    url: `/api/pages/${page.id}/download`,
+    headers: { cookie: sessionCookie(login) },
+  });
+  assert.equal(downloaded.statusCode, 200);
+  assert.match(downloaded.headers['content-type'], /application\/pdf/);
+  assert.match(downloaded.headers['content-disposition'], /attachment/);
+  assert.match(downloaded.body, /^%PDF-1\.4/);
+  assert.equal(app.store.getPage(page.id).downloadCount, 1);
+
   const editDenied = await app.inject({ method: 'GET', url: `${page.url}?edit=1`, headers: { cookie: sessionCookie(login) } });
   assert.equal(editDenied.statusCode, 400);
   assert.equal(editDenied.json().error, 'Document assets cannot be edited online');

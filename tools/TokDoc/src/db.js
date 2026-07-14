@@ -29,6 +29,7 @@ export function createDb(config) {
       checksum TEXT NOT NULL,
       edited INTEGER NOT NULL DEFAULT 0,
       access_count INTEGER NOT NULL DEFAULT 0,
+      download_count INTEGER NOT NULL DEFAULT 0,
       visibility TEXT NOT NULL DEFAULT 'public',
       deleted_at TEXT,
       deleted_path TEXT
@@ -71,6 +72,9 @@ export function createDb(config) {
   const pageColumns = db.prepare('PRAGMA table_info(pages)').all().map((column) => column.name);
   if (!pageColumns.includes('access_count')) {
     db.exec('ALTER TABLE pages ADD COLUMN access_count INTEGER NOT NULL DEFAULT 0;');
+  }
+  if (!pageColumns.includes('download_count')) {
+    db.exec('ALTER TABLE pages ADD COLUMN download_count INTEGER NOT NULL DEFAULT 0;');
   }
   if (!pageColumns.includes('deleted_at')) {
     db.exec('ALTER TABLE pages ADD COLUMN deleted_at TEXT;');
