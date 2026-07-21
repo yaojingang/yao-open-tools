@@ -159,6 +159,10 @@ function isActiveAdminSettingsPath(pathname, adminPath) {
   return normalizedPath(pathname) === `${adminPath}/settings`;
 }
 
+function isActiveAdminAnalyticsPath(pathname, adminPath) {
+  return normalizedPath(pathname) === `${adminPath}/analytics`;
+}
+
 function isLegacyApiPath(pathname) {
   return pathname === '/api' || pathname.startsWith('/api/');
 }
@@ -187,13 +191,16 @@ function requestAccessState(app, request) {
   const usingDefaultAdminPath = adminPath === defaultAdminPath;
   const isPublicPageView = pathname.startsWith('/pages/') && url.searchParams.get('edit') !== '1';
   const isPublicShortPageView = /^\/[a-z0-9]{6}$/.test(pathname) && url.searchParams.get('edit') !== '1';
+  const isPublicShortPageFile = /^\/[a-z0-9]{6}\/file$/i.test(pathname);
   const isPublicShortPageDownload = /^\/[a-z0-9]{6}\/download$/i.test(pathname);
   if (pathname === '/healthz' || pathname === '/favicon.ico' || pathname.startsWith('/assets/') || pathname.startsWith('/page-assets/')) return 'public';
   if (isPublicListPath(pathname)) return 'public';
   if (pathname === '/admin' || pathname === '/admin/') return usingDefaultAdminPath ? 'public' : 'not-found';
   if (pathname === '/admin/settings' || pathname === '/admin/settings/') return usingDefaultAdminPath ? 'public' : 'not-found';
+  if (pathname === '/admin/analytics' || pathname === '/admin/analytics/') return usingDefaultAdminPath ? 'public' : 'not-found';
   if (isActiveAdminPath(pathname, adminPath)) return 'public';
   if (isActiveAdminSettingsPath(pathname, adminPath)) return 'public';
+  if (isActiveAdminAnalyticsPath(pathname, adminPath)) return 'public';
   if (isLegacyApiPath(pathname)) {
     if (!usingDefaultAdminPath) return 'not-found';
     return publicApiSuffix(pathname, adminPath) ? 'public' : 'protected';
@@ -202,12 +209,210 @@ function requestAccessState(app, request) {
     if (!isActiveAdminApiPath(pathname, adminPath)) return 'not-found';
     return publicApiSuffix(pathname, adminPath) ? 'public' : 'protected';
   }
-  if (isPublicShortPageView || isPublicPageView || isPublicShortPageDownload) return 'public';
+  if (isPublicShortPageView || isPublicPageView || isPublicShortPageFile || isPublicShortPageDownload) return 'public';
   return 'protected';
 }
 
 function downloadFileNameForPage(page, filePath) {
   return path.basename(filePath || page.generatedPath || page.fileName || 'document');
+}
+
+function downloadUrlForPage(page) {
+  return `${page.url || `/${page.slug}`}/download`;
+}
+
+function fileUrlForPage(page) {
+  return `/pages/${page.slug}/file`;
+}
+
+function renderDownloadIcon() {
+  return `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>`;
+}
+
+function renderDocumentReader(page) {
+  const title = page.title || page.fileName || page.slug;
+  const fileUrl = `${fileUrlForPage(page)}#toolbar=0&navpanes=0`;
+  const downloadUrl = downloadUrlForPage(page);
+  return `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${escapeHtml(title)} - TokDoc</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bar: #343434;
+        --bar-soft: #3f3f3f;
+        --line: rgba(255, 255, 255, 0.14);
+        --text: #f6f6f3;
+        --muted: rgba(246, 246, 243, 0.74);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: #2b2b2b;
+        color: var(--text);
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+      .reader-shell {
+        display: grid;
+        grid-template-rows: 48px 1fr;
+        width: 100%;
+        height: 100%;
+      }
+      .reader-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        min-width: 0;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--line);
+        background: var(--bar);
+      }
+      .reader-title {
+        min-width: 0;
+        overflow: hidden;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .reader-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        flex: 0 0 auto;
+        gap: 8px;
+      }
+      .reader-download {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        min-height: 34px;
+        padding: 0 11px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--bar-soft);
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .reader-download:hover {
+        border-color: rgba(255, 255, 255, 0.34);
+        background: #4a4a4a;
+      }
+      .reader-frame {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        background: #2b2b2b;
+      }
+      @media (max-width: 640px) {
+        .reader-toolbar {
+          padding: 0 10px;
+        }
+        .reader-download span {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="reader-shell">
+      <header class="reader-toolbar">
+        <div class="reader-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div>
+        <div class="reader-actions">
+          <a class="reader-download" href="${escapeHtml(downloadUrl)}" download aria-label="下载 ${escapeHtml(title)}">${renderDownloadIcon()}<span>下载</span></a>
+        </div>
+      </header>
+      <iframe class="reader-frame" src="${escapeHtml(fileUrl)}" title="${escapeHtml(title)}"></iframe>
+    </main>
+  </body>
+</html>`;
+}
+
+function injectDocumentDownloadToolbar(page, html) {
+  const title = page.title || page.fileName || page.slug;
+  const toolbar = `<div data-tokdoc-reader-toolbar><a href="${escapeHtml(downloadUrlForPage(page))}" download aria-label="下载 ${escapeHtml(title)}">${renderDownloadIcon()}<span>下载</span></a></div>`;
+  const style = `<style data-tokdoc-reader-toolbar>
+    [data-tokdoc-reader-toolbar] {
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      z-index: 2147483000;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      pointer-events: none;
+    }
+    [data-tokdoc-reader-toolbar] a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      min-height: 36px;
+      padding: 0 12px;
+      border: 1px solid rgba(28, 55, 95, 0.16);
+      border-radius: 9px;
+      background: rgba(255, 254, 250, 0.94);
+      box-shadow: 0 8px 24px rgba(23, 32, 45, 0.12);
+      color: #1d426e;
+      font: 600 13px/1 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      text-decoration: none;
+      pointer-events: auto;
+      backdrop-filter: blur(8px);
+    }
+    [data-tokdoc-reader-toolbar] a:hover {
+      border-color: rgba(28, 55, 95, 0.28);
+      background: #fffefa;
+    }
+    @media (max-width: 640px) {
+      [data-tokdoc-reader-toolbar] {
+        top: 10px;
+        right: 10px;
+      }
+      [data-tokdoc-reader-toolbar] a span {
+        display: none;
+      }
+    }
+  </style>`;
+  if (/<\/head>/i.test(html)) return html.replace(/<\/head>/i, `${style}</head>`).replace(/<body([^>]*)>/i, `<body$1>${toolbar}`);
+  if (/<body([^>]*)>/i.test(html)) return `${style}${html.replace(/<body([^>]*)>/i, `<body$1>${toolbar}`)}`;
+  return `${style}${toolbar}${html}`;
+}
+
+async function sendGeneratedInlineFile(app, request, reply, rawSlug) {
+  const slug = String(rawSlug || '').replace(/\.html?$/i, '');
+  if (!/^[a-z0-9]{6}$/.test(slug)) return sendNotFound(reply, 'Page not found');
+  const page = app.store.getActivePageBySlug(slug);
+  if (!page) return sendNotFound(reply, 'Page not found');
+  const session = currentSession(app, request);
+  if (page.visibility === 'private' && !session) return sendNotFound(reply, 'Page not found');
+  const filePath = await app.store.resolveGeneratedPath(page);
+  const buffer = await app.store.readPageFile(page);
+  return reply
+    .header('cache-control', 'no-store')
+    .header('content-disposition', inlineContentDisposition(downloadFileNameForPage(page, filePath)))
+    .type(page.mimeType || 'application/octet-stream')
+    .send(buffer);
 }
 
 async function sendGeneratedPage(app, request, reply, rawSlug) {
@@ -222,15 +427,15 @@ async function sendGeneratedPage(app, request, reply, rawSlug) {
     return reply.code(400).send({ error: 'Document assets cannot be edited online' });
   }
   if (!isHtmlBackedFileType(page.fileType, page.mimeType)) {
-    const buffer = await app.store.readPageFile(page);
-    return reply
-      .header('cache-control', 'no-store')
-      .header('content-disposition', inlineContentDisposition(`${page.slug}.pdf`))
-      .type(page.mimeType || 'application/pdf')
-      .send(buffer);
+    return reply.header('cache-control', 'no-store').type('text/html; charset=utf-8').send(renderDocumentReader(page));
   }
   const html = await app.store.readPageHtml(page);
-  const output = request.query?.edit === '1' && isEditableFileType(page.fileType, page.mimeType) ? injectEditBridge(page, html, app.store.getAdminPath()) : html;
+  const output =
+    request.query?.edit === '1' && isEditableFileType(page.fileType, page.mimeType)
+      ? injectEditBridge(page, html, app.store.getAdminPath())
+      : page.fileType && page.fileType !== 'html'
+        ? injectDocumentDownloadToolbar(page, html)
+        : html;
   return reply.header('cache-control', 'no-store').type('text/html; charset=utf-8').send(output);
 }
 
@@ -338,6 +543,10 @@ function registerApiRoutes(app, prefix = '') {
       pagination: result.pagination,
     };
   });
+
+  app.get(`${prefix}/api/analytics`, async () => ({
+    analytics: app.store.getAnalytics(),
+  }));
 
   app.get(`${prefix}/api/pages/:id`, async (request, reply) => {
     const page = app.store.getPage(request.params.id);
@@ -611,10 +820,16 @@ export function registerRoutes(app) {
   app.get('/admin/', async (request, reply) => sendAdmin(app, reply));
   app.get('/admin/settings', async (request, reply) => sendAdmin(app, reply));
   app.get('/admin/settings/', async (request, reply) => sendAdmin(app, reply));
+  app.get('/admin/analytics', async (request, reply) => sendAdmin(app, reply));
+  app.get('/admin/analytics/', async (request, reply) => sendAdmin(app, reply));
   app.get('/favicon.ico', async (request, reply) => reply.code(204).send());
 
   registerApiRoutes(app);
   registerApiRoutes(app, '/:adminPath');
+
+  app.get('/pages/:slug/file', async (request, reply) => {
+    return sendGeneratedInlineFile(app, request, reply, request.params.slug);
+  });
 
   app.get('/pages/:slug', async (request, reply) => {
     return sendGeneratedPage(app, request, reply, request.params.slug);
@@ -639,9 +854,24 @@ export function registerRoutes(app) {
     return sendNotFound(reply, 'Page not found');
   });
 
+  app.get('/:slug/analytics', async (request, reply) => {
+    if (isActiveAdminPath(`/${request.params.slug}`, app.store.getAdminPath())) return sendAdmin(app, reply);
+    return sendNotFound(reply, 'Page not found');
+  });
+
+  app.get('/:slug/analytics/', async (request, reply) => {
+    if (isActiveAdminPath(`/${request.params.slug}`, app.store.getAdminPath())) return sendAdmin(app, reply);
+    return sendNotFound(reply, 'Page not found');
+  });
+
   app.get('/:slug/download', async (request, reply) => {
     if (isActiveAdminPath(`/${request.params.slug}`, app.store.getAdminPath())) return sendNotFound(reply, 'Page not found');
     return sendGeneratedDownload(app, request, reply, request.params.slug);
+  });
+
+  app.get('/:slug/file', async (request, reply) => {
+    if (isActiveAdminPath(`/${request.params.slug}`, app.store.getAdminPath())) return sendNotFound(reply, 'Page not found');
+    return sendGeneratedInlineFile(app, request, reply, request.params.slug);
   });
 
   app.get('/:slug', async (request, reply) => {

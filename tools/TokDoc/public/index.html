@@ -21,6 +21,7 @@
         --accent: #1B365D;
         --accent-hover: #142844;
         --accent-ink: #faf9f5;
+        --accent-soft: #eef2f7;
         --blue: #1B365D;
         --blue-soft: #eef2f7;
         --green: #365f45;
@@ -307,6 +308,7 @@
         background: var(--panel);
         cursor: pointer;
         text-decoration: none;
+        white-space: nowrap;
         transition:
           background 150ms ease,
           border-color 150ms ease,
@@ -493,16 +495,19 @@
       }
 
       .settings-page[hidden],
+      .analytics-page[hidden],
       .manager-view[hidden] {
         display: none;
       }
 
-      .settings-page {
+      .settings-page,
+      .analytics-page {
         display: grid;
         gap: var(--grid-gap);
       }
 
-      .settings-hero {
+      .settings-hero,
+      .analytics-hero {
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
@@ -510,15 +515,18 @@
         padding: var(--panel-pad);
       }
 
-      .settings-hero .section-title {
+      .settings-hero .section-title,
+      .analytics-hero .section-title {
         font-size: 24px;
       }
 
-      .settings-hero .section-note {
+      .settings-hero .section-note,
+      .analytics-hero .section-note {
         margin-top: 10px;
       }
 
-      .settings-hero-actions {
+      .settings-hero-actions,
+      .analytics-hero-actions {
         display: flex;
         flex-wrap: wrap;
         justify-content: flex-end;
@@ -537,6 +545,243 @@
         display: grid;
         gap: var(--grid-gap);
         min-width: 0;
+      }
+
+      .analytics-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.42fr) minmax(320px, 0.72fr);
+        gap: var(--grid-gap);
+        align-items: start;
+      }
+
+      .analytics-main,
+      .analytics-side {
+        display: grid;
+        gap: var(--grid-gap);
+        min-width: 0;
+      }
+
+      .analytics-section {
+        display: grid;
+        gap: 18px;
+        padding: var(--panel-pad);
+      }
+
+      .analytics-section-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .analytics-time {
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .analytics-kpis {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .analytics-kpi {
+        min-width: 0;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fffefa;
+        box-shadow: inset 0 1px 0 #ffffff;
+      }
+
+      .analytics-kpi span,
+      .analytics-kpi small {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .analytics-kpi strong {
+        display: block;
+        margin: 8px 0 4px;
+        overflow: hidden;
+        color: var(--accent);
+        font-family: var(--serif);
+        font-size: 28px;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .trend-chart {
+        display: grid;
+        gap: 12px;
+      }
+
+      .trend-legend {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 14px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .trend-legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .legend-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--accent);
+      }
+
+      .legend-dot.is-update {
+        background: #8a6b2f;
+      }
+
+      .trend-bars {
+        display: grid;
+        grid-template-columns: repeat(14, minmax(18px, 1fr));
+        align-items: end;
+        gap: 8px;
+        min-height: 170px;
+        padding: 12px 10px 8px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background:
+          linear-gradient(180deg, transparent 0 32%, rgba(232, 229, 218, 0.65) 32% calc(32% + 1px), transparent calc(32% + 1px)),
+          linear-gradient(180deg, transparent 0 66%, rgba(232, 229, 218, 0.65) 66% calc(66% + 1px), transparent calc(66% + 1px)),
+          #fffefa;
+      }
+
+      .trend-day {
+        display: grid;
+        align-items: end;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .trend-stack {
+        display: flex;
+        align-items: end;
+        justify-content: center;
+        gap: 3px;
+        height: 124px;
+      }
+
+      .trend-bar {
+        display: block;
+        width: min(12px, 42%);
+        border-radius: 999px 999px 3px 3px;
+      }
+
+      .trend-bar-upload {
+        background: var(--accent);
+      }
+
+      .trend-bar-update {
+        background: #8a6b2f;
+      }
+
+      .trend-label {
+        overflow: hidden;
+        color: var(--muted);
+        font-size: 11px;
+        text-align: center;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .analytics-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .analytics-row {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        min-height: 46px;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--ink-soft);
+        background: #fffefa;
+        text-decoration: none;
+      }
+
+      .analytics-row-link:hover {
+        border-color: var(--line-strong);
+        background: #f8f7f1;
+      }
+
+      .analytics-row-main {
+        display: grid;
+        gap: 5px;
+        min-width: 0;
+      }
+
+      .analytics-row-main strong,
+      .analytics-row-main small {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .analytics-row-main strong {
+        color: var(--ink);
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .analytics-row-main small {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .analytics-number {
+        color: var(--accent);
+        font-family: var(--mono);
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+        white-space: nowrap;
+      }
+
+      .analytics-meter {
+        display: block;
+        height: 4px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: var(--sand);
+      }
+
+      .analytics-meter i {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--accent);
+      }
+
+      .analytics-empty {
+        min-height: 72px;
+        display: grid;
+        place-items: center;
+        color: var(--muted);
+        border: 1px dashed var(--line-strong);
+        border-radius: 8px;
+        background: #fffefa;
       }
 
       .table-panel {
@@ -1811,6 +2056,7 @@
         .overview,
         .content-area,
         .settings-grid,
+        .analytics-grid,
         .preview-body,
         .editor-body {
           grid-template-columns: 1fr;
@@ -1845,6 +2091,22 @@
           width: 100%;
         }
 
+        .topbar > .topbar-inner > .topbar-actions {
+          width: 100%;
+          justify-content: flex-start;
+          overflow-x: auto;
+          padding-bottom: 2px;
+          scrollbar-width: none;
+        }
+
+        .topbar > .topbar-inner > .topbar-actions::-webkit-scrollbar {
+          display: none;
+        }
+
+        .topbar > .topbar-inner > .topbar-actions > * {
+          flex: none;
+        }
+
         .workspace {
           padding: 16px;
         }
@@ -1866,13 +2128,25 @@
           flex-direction: column;
         }
 
-        .settings-hero {
+        .settings-hero,
+        .analytics-hero,
+        .analytics-section-head {
           align-items: stretch;
           flex-direction: column;
         }
 
-        .settings-hero-actions {
+        .settings-hero-actions,
+        .analytics-hero-actions {
           justify-content: flex-start;
+        }
+
+        .analytics-kpis {
+          grid-template-columns: 1fr;
+        }
+
+        .trend-bars {
+          grid-template-columns: repeat(14, 28px);
+          overflow-x: auto;
         }
 
         .filter-panel {
@@ -1997,6 +2271,15 @@
           <div class="topbar-actions">
             <span class="status-pill"><span class="status-dot"></span>本地服务在线</span>
             <span class="auth-chip" id="authUserLabel">未登录</span>
+            <a class="btn" id="openAnalytics" href="/admin/analytics">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 3v18h18"></path>
+                <rect width="3" height="8" x="7" y="9" rx="1"></rect>
+                <rect width="3" height="12" x="13" y="5" rx="1"></rect>
+                <rect width="3" height="5" x="19" y="12" rx="1"></rect>
+              </svg>
+              数据分析
+            </a>
             <a class="btn" id="openPublicHome" href="/" target="_blank" rel="noreferrer">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M15 3h6v6"></path>
@@ -2168,6 +2451,97 @@
             <div class="pagination-bar" id="paginationBar" aria-label="页面列表分页"></div>
           </div>
 
+        </section>
+      </main>
+
+      <main class="workspace analytics-page" id="analyticsPage" hidden>
+        <section class="panel analytics-hero" aria-label="数据分析概览">
+          <div>
+            <h1 class="section-title">数据分析</h1>
+            <p class="section-note">集中查看文档规模、访问、下载、类型分布和近期上传编辑趋势。</p>
+          </div>
+          <div class="analytics-hero-actions">
+            <span class="status-pill" id="analyticsGeneratedAt">等待加载</span>
+            <button class="btn" id="refreshAnalytics" type="button">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
+                <path d="M21 3v6h-6"></path>
+              </svg>
+              刷新数据
+            </button>
+            <a class="btn" id="analyticsBackLink" href="/admin">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="m12 19-7-7 7-7"></path>
+                <path d="M19 12H5"></path>
+              </svg>
+              返回管理器
+            </a>
+          </div>
+        </section>
+
+        <section class="analytics-grid" aria-label="数据分析看板">
+          <div class="analytics-main">
+            <section class="panel analytics-section" aria-label="核心数据">
+              <div class="analytics-section-head">
+                <div>
+                  <h2 class="section-title">核心数据</h2>
+                  <p class="section-note">按当前后台全部有效文档统计，回收站仅计入回收站指标。</p>
+                </div>
+              </div>
+              <div class="analytics-kpis" id="analyticsMetrics"></div>
+            </section>
+
+            <section class="panel analytics-section" aria-label="近期趋势">
+              <div class="analytics-section-head">
+                <div>
+                  <h2 class="section-title">14 天趋势</h2>
+                  <p class="section-note">蓝色为上传，棕色为已编辑文档的更新。</p>
+                </div>
+                <div class="trend-legend" aria-hidden="true">
+                  <span><i class="legend-dot"></i>上传</span>
+                  <span><i class="legend-dot is-update"></i>编辑</span>
+                </div>
+              </div>
+              <div class="trend-chart">
+                <div class="trend-bars" id="analyticsTrendBars"></div>
+              </div>
+            </section>
+
+            <section class="panel analytics-section" aria-label="类型分布">
+              <div>
+                <h2 class="section-title">类型分布</h2>
+                <p class="section-note">对比不同格式的数量、访问、下载和占用空间。</p>
+              </div>
+              <div class="analytics-list" id="analyticsTypeList"></div>
+            </section>
+          </div>
+
+          <aside class="analytics-side">
+            <section class="panel analytics-section" aria-label="访问排行">
+              <div>
+                <h2 class="section-title">访问排行</h2>
+                <p class="section-note">按文档累计访问数排序，点击可新窗口打开。</p>
+              </div>
+              <div class="analytics-list" id="analyticsTopAccess"></div>
+            </section>
+
+            <section class="panel analytics-section" aria-label="下载排行">
+              <div>
+                <h2 class="section-title">下载排行</h2>
+                <p class="section-note">按详情页下载按钮累计点击排序。</p>
+              </div>
+              <div class="analytics-list" id="analyticsTopDownloads"></div>
+            </section>
+
+            <section class="panel analytics-section" aria-label="可见性与状态">
+              <div>
+                <h2 class="section-title">公开状态</h2>
+                <p class="section-note">用于检查前台可见内容和后台管理状态。</p>
+              </div>
+              <div class="analytics-list" id="analyticsVisibilityList"></div>
+              <div class="analytics-list" id="analyticsStatusList"></div>
+            </section>
+          </aside>
         </section>
       </main>
 

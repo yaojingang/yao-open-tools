@@ -843,11 +843,11 @@ test('builds a public page list with type filters and public-only fields', async
   assert.deepEqual(all.stats, { all: 2, html: 1, markdown: 0, pdf: 1, word: 0, presentation: 0, keynote: 0, spreadsheet: 0 });
   assert.equal(all.pages.some((page) => page.slug === privatePage.slug), false);
   assert.equal(all.pages[0].url.startsWith('/'), true);
-  assert.equal(all.pages[0].downloadUrl, `${all.pages[0].url}/download`);
   assert.equal(Object.hasOwn(all.pages[0], 'id'), false);
   assert.equal(Object.hasOwn(all.pages[0], 'sourcePath'), false);
   assert.equal(Object.hasOwn(all.pages[0], 'generatedPath'), false);
   assert.equal(Object.hasOwn(all.pages[0], 'editUrl'), false);
+  assert.equal(Object.hasOwn(all.pages[0], 'downloadUrl'), false);
   assert.equal(Object.hasOwn(all.pages[0], 'revision'), false);
   assert.equal(Object.hasOwn(all.pages[0], 'visibility'), false);
 
@@ -905,6 +905,69 @@ test('stores the public homepage setting with an enabled default', async (t) => 
   assert.equal(store.getSettings().publicHomepageEnabled, false);
   await store.saveSettings({ publicHomepageEnabled: true });
   assert.equal(store.getSettings().publicHomepageEnabled, true);
+});
+
+test('builds management analytics without mutating document records', async (t) => {
+  const { store, db, dataDir } = await createStore();
+  t.after(() => db.close());
+  t.after(() => fs.rm(dataDir, { recursive: true, force: true }));
+
+  const htmlPage = await store.importBuffer({
+    fileName: 'analytics-html.html',
+    relativePath: 'reports/analytics-html.html',
+    buffer: Buffer.from('<!doctype html><html><head><title>分析 HTML</title></head><body><h1>分析 HTML</h1></body></html>'),
+  });
+  const pdfPage = await store.importBuffer({
+    fileName: 'analytics-pdf.pdf',
+    relativePath: 'pdf/analytics-pdf.pdf',
+    buffer: Buffer.from('%PDF-1.4\nanalytics pdf\n'),
+  });
+  await store.importBuffer({
+    fileName: 'private-markdown.md',
+    relativePath: 'notes/private-markdown.md',
+    buffer: Buffer.from('# 私有 Markdown\n\n用于分析。'),
+    visibility: 'private',
+  });
+  const trashPage = await store.importBuffer({
+    fileName: 'analytics-trash.html',
+    relativePath: 'trash/analytics-trash.html',
+    buffer: Buffer.from('<!doctype html><html><head><title>分析回收站</title></head><body><h1>分析回收站</h1></body></html>'),
+  });
+  await store.deletePage(trashPage.id);
+
+  store.incrementAccessCount(htmlPage.id);
+  store.incrementAccessCount(htmlPage.id);
+  store.incrementAccessCount(pdfPage.id);
+  store.incrementDownloadCount(htmlPage.id);
+  store.incrementDownloadCount(pdfPage.id);
+  store.incrementDownloadCount(pdfPage.id);
+  db.prepare('UPDATE pages SET edited = 1, updated_at = ? WHERE id = ?').run(new Date().toISOString(), htmlPage.id);
+
+  const beforeCount = db.prepare('SELECT COUNT(*) AS count FROM pages').get().count;
+  const analytics = store.getAnalytics();
+  const afterCount = db.prepare('SELECT COUNT(*) AS count FROM pages').get().count;
+
+  assert.equal(beforeCount, afterCount);
+  assert.equal(analytics.summary.activeDocuments, 3);
+  assert.equal(analytics.summary.publicDocuments, 2);
+  assert.equal(analytics.summary.privateDocuments, 1);
+  assert.equal(analytics.summary.trashDocuments, 1);
+  assert.equal(analytics.summary.editableDocuments, 2);
+  assert.equal(analytics.summary.totalAccess, 3);
+  assert.equal(analytics.summary.totalDownloads, 3);
+  assert.equal(analytics.trend.length, 14);
+  assert.deepEqual(Object.keys(analytics.trend[0]).sort(), ['key', 'label', 'updates', 'uploads']);
+  assert.equal(analytics.byType.find((item) => item.type === 'html').count, 1);
+  assert.equal(analytics.byType.find((item) => item.type === 'html').access, 2);
+  assert.equal(analytics.byType.find((item) => item.type === 'pdf').downloads, 2);
+  assert.equal(analytics.status.find((item) => item.key === 'edited').count, 1);
+  assert.equal(analytics.status.find((item) => item.key === 'trash').count, 1);
+  assert.equal(analytics.topAccess.length, 2);
+  assert.equal(analytics.topDownloads.length, 2);
+  assert.equal(analytics.topAccess[0].slug, htmlPage.slug);
+  assert.equal(analytics.topDownloads[0].slug, pdfPage.slug);
+  assert.equal(analytics.topAccess.some((item) => item.fileName === 'private-markdown.md'), false);
+  assert.equal(analytics.topDownloads.some((item) => item.fileName === 'private-markdown.md'), false);
 });
 
 test('tracks page access and download counts for generated HTML views', async (t) => {

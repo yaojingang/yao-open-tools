@@ -89,10 +89,6 @@ function documentUrl(page) {
   return page.url || `/${page.slug}`;
 }
 
-function documentDownloadUrl(page) {
-  return page.downloadUrl || `${documentUrl(page)}/download`;
-}
-
 function queryString() {
   const params = new URLSearchParams();
   state.sort = normalizePublicSort(state.sort);
@@ -149,7 +145,6 @@ function renderRows() {
   els.rows.innerHTML = state.pages
     .map((page) => {
       const url = documentUrl(page);
-      const downloadUrl = documentDownloadUrl(page);
       return `<tr data-url="${escapeHtml(url)}">
         <td>${typeBadge(page)}</td>
         <td class="title-cell">
@@ -158,7 +153,7 @@ function renderRows() {
         </td>
         <td>${escapeHtml(page.uploadTime || page.updatedTime || '-')}</td>
         <td>${escapeHtml(formatSize(page.size))}</td>
-        <td>
+        <td class="action-cell">
           <div class="doc-actions">
             <a class="open-btn" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" aria-label="打开 ${escapeHtml(page.title || page.fileName || page.slug)}">
               打开
@@ -166,14 +161,6 @@ function renderRows() {
                 <path d="M15 3h6v6"></path>
                 <path d="M10 14 21 3"></path>
                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-              </svg>
-            </a>
-            <a class="open-btn download-btn" href="${escapeHtml(downloadUrl)}" download aria-label="下载 ${escapeHtml(page.title || page.fileName || page.slug)}">
-              下载
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 3v12"></path>
-                <path d="m7 10 5 5 5-5"></path>
-                <path d="M5 21h14"></path>
               </svg>
             </a>
           </div>
@@ -187,7 +174,6 @@ function renderCards() {
   els.cards.innerHTML = state.pages
     .map((page) => {
       const url = documentUrl(page);
-      const downloadUrl = documentDownloadUrl(page);
       return `<article class="doc-card" data-url="${escapeHtml(url)}">
         <div class="card-head">
           <div class="card-title">
@@ -199,7 +185,6 @@ function renderCards() {
         <div class="card-meta">${escapeHtml(formatSize(page.size))} · ${escapeHtml(page.uploadTime || page.updatedTime || '-')}</div>
         <div class="doc-actions">
           <a class="open-btn" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">打开文档</a>
-          <a class="open-btn download-btn" href="${escapeHtml(downloadUrl)}" download>下载</a>
         </div>
       </article>`;
     })

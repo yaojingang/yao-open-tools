@@ -13,6 +13,7 @@ test('keeps the page list full width and moves watch directories into settings',
   const overview = html.match(/<section class="overview"[\s\S]*?<section class="content-area"/)?.[0] || '';
   const sideSummary = overview.match(/<aside class="panel side-summary"[\s\S]*?<\/aside>/)?.[0] || '';
   const settingsPage = html.match(/<main class="workspace settings-page" id="settingsPage"[\s\S]*?<\/main>/)?.[0] || '';
+  const analyticsPage = html.match(/<main class="workspace analytics-page" id="analyticsPage"[\s\S]*?<\/main>/)?.[0] || '';
 
   assert.match(contentArea, /class="panel table-panel"/);
   assert.doesNotMatch(contentArea, /class="inspector"/);
@@ -45,7 +46,22 @@ test('keeps the page list full width and moves watch directories into settings',
   assert.match(html, /id="loginBackdrop"/);
   assert.match(html, /TokDoc 本地文档管理器/);
   assert.match(html, /TokDoc 登录/);
+  assert.match(html, /id="openAnalytics"/);
   assert.match(html, /id="openPublicHome"/);
+  assert.equal(html.indexOf('id="openAnalytics"') < html.indexOf('id="openPublicHome"'), true);
+  assert.match(html, /href="\/admin\/analytics"/);
+  assert.match(analyticsPage, /数据分析/);
+  assert.match(analyticsPage, /id="analyticsMetrics"/);
+  assert.match(analyticsPage, /id="analyticsTrendBars"/);
+  assert.match(analyticsPage, /id="analyticsTypeList"/);
+  assert.match(analyticsPage, /id="analyticsTopAccess"/);
+  assert.match(analyticsPage, /id="analyticsTopDownloads"/);
+  assert.match(analyticsPage, /id="analyticsVisibilityList"/);
+  assert.match(analyticsPage, /id="analyticsStatusList"/);
+  assert.match(analyticsPage, /id="analyticsBackLink"/);
+  assert.match(analyticsPage, /id="refreshAnalytics"/);
+  assert.match(html, /\.analytics-kpis\s*\{/);
+  assert.match(html, /\.trend-bars\s*\{/);
   assert.match(html, /<a class="brand brand-link" id="adminHomeLink" href="\/admin" aria-label="返回后台首页">/);
   assert.match(html, /href="\/admin\/settings"/);
   assert.doesNotMatch(html, /tokhtml 登录/);
@@ -112,7 +128,12 @@ test('defines a standalone public document index page', async () => {
   assert.match(html, /<th>操作<\/th>/);
   assert.doesNotMatch(html, /<th>目录<\/th>/);
   assert.doesNotMatch(html, /搜索标题、文件名、目录或短链接/);
+  assert.match(html, /\.sort-wrap select\s*\{[\s\S]*?appearance:\s*none;/);
+  assert.match(html, /\.sort-wrap select\s*\{[\s\S]*?padding:\s*0 36px 0 12px;/);
+  assert.match(html, /thead th:last-child\s*\{[\s\S]*?text-align:\s*center;/);
+  assert.match(html, /\.action-cell\s*\{/);
   assert.match(html, /\.doc-actions\s*\{/);
+  assert.doesNotMatch(html, /\.download-btn\s*\{/);
   assert.match(html, /https:\/\/github\.com\/yaojingang\/yao-open-tools\/tree\/main\/tools\/TokDoc/);
   assert.match(html, /开源地址/);
   assert.doesNotMatch(html, />访问次数</);
@@ -127,9 +148,9 @@ test('opens public documents in a new tab and defaults public pagination to 10',
   assert.match(script, /pageSize:\s*10/);
   assert.match(script, /target="_blank"/);
   assert.match(script, /rel="noopener noreferrer"/);
-  assert.match(script, /downloadUrl/);
-  assert.match(script, /\/download/);
-  assert.match(script, /class="open-btn download-btn"/);
+  assert.doesNotMatch(script, /downloadUrl/);
+  assert.doesNotMatch(script, /\/download/);
+  assert.doesNotMatch(script, /download-btn/);
   assert.doesNotMatch(script, /directoryName/);
   assert.match(script, /window\.open\(row\.dataset\.url, '_blank', 'noopener,noreferrer'\)/);
   assert.doesNotMatch(script, /accessCount/);
@@ -150,6 +171,11 @@ test('stages uploads with progress before confirming them into the page list', a
   assert.match(script, /data-action="download"/);
   assert.match(script, /downloadCount/);
   assert.match(script, /\/api\/pages\/.*\/download/);
+  assert.match(script, /\/api\/analytics/);
+  assert.match(script, /analyticsUrl\(\)/);
+  assert.match(script, /function renderAnalytics\(\)/);
+  assert.match(script, /analyticsMetrics/);
+  assert.match(script, /analyticsTrendBars/);
   assert.match(script, /typeTabs:\s*document\.querySelector\('#typeTabs'\)/);
   assert.match(script, /function renderTypeTabs\(\)/);
   assert.match(script, /querySelectorAll\('\[data-type\]'\)/);

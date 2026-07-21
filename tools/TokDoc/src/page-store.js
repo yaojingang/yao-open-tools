@@ -58,6 +58,45 @@ function dateStamp(iso) {
   return `${year}${month}${day}`;
 }
 
+function analyticsDayKey(value = Date.now()) {
+  const stamp = dateStamp(value);
+  return `${stamp.slice(0, 4)}-${stamp.slice(4, 6)}-${stamp.slice(6, 8)}`;
+}
+
+function analyticsDayLabel(key) {
+  return key ? `${key.slice(5, 7)}/${key.slice(8, 10)}` : '-';
+}
+
+function analyticsDayRange(days = 14) {
+  const end = new Date();
+  end.setHours(0, 0, 0, 0);
+  return Array.from({ length: days }, (_, index) => {
+    const day = new Date(end);
+    day.setDate(end.getDate() - (days - index - 1));
+    const key = analyticsDayKey(day);
+    return { key, label: analyticsDayLabel(key) };
+  });
+}
+
+function analyticsPageSummary(page) {
+  return {
+    id: page.id,
+    slug: page.slug,
+    title: page.title,
+    fileName: page.fileName,
+    fileType: page.fileType,
+    directoryName: page.directoryName || '',
+    size: page.size || 0,
+    accessCount: page.accessCount || 0,
+    downloadCount: page.downloadCount || 0,
+    visibility: page.visibility,
+    status: page.status,
+    uploadTime: page.uploadTime,
+    updatedTime: page.updatedTime,
+    url: page.url,
+  };
+}
+
 function generatedFileNameForPage(page) {
   return generatedFileNameForAsset(page, generatedExtensionForPage(page));
 }
@@ -174,7 +213,6 @@ function publicPageSummary(page) {
     uploadTime: page.uploadTime,
     updatedTime: page.updatedTime,
     url: page.url,
-    downloadUrl: `${page.url}/download`,
   };
 }
 
@@ -372,6 +410,98 @@ export class PageStore {
         hasPrev: page > 1,
         hasNext: page < totalPages,
       },
+    };
+  }
+
+  getAnalytics() {
+    const activePages = this.listPages({ scope: 'active', status: 'all' });
+    const trashPages = this.listPages({ scope: 'trash', status: 'trashed' });
+    const totalAccess = activePages.reduce((sum, page) => sum + Number(page.accessCount || 0), 0);
+    const totalDownloads = activePages.reduce((sum, page) => sum + Number(page.downloadCount || 0), 0);
+    const totalSize = activePages.reduce((sum, page) => sum + Number(page.size || 0), 0);
+    const todayKey = analyticsDayKey();
+    const days = analyticsDayRange(14);
+    const trendByDay = new Map(days.map((day) => [day.key, { ...day, uploads: 0, updates: 0 }]));
+
+    for (const page of activePages) {
+      const createdKey = analyticsDayKey(page.createdAt);
+      const updatedKey = analyticsDayKey(page.updatedAt);
+      if (trendByDay.has(createdKey)) {
+        trendByDay.get(createdKey).uploads += 1;
+      }
+      if (trendByDay.has(updatedKey)) {
+        trendByDay.get(updatedKey).updates += page.edited ? 1 : 0;
+      }
+    }
+
+    const byType = managedFileTypes.map((type) => {
+      const typedPages = activePages.filter((page) => page.fileType === type);
+      return {
+        type,
+        count: typedPages.length,
+        access: typedPages.reduce((sum, page) => sum + Number(page.accessCount || 0), 0),
+        downloads: typedPages.reduce((sum, page) => sum + Number(page.downloadCount || 0), 0),
+        size: typedPages.reduce((sum, page) => sum + Number(page.size || 0), 0),
+        share: activePages.length ? Math.round((typedPages.length / activePages.length) * 100) : 0,
+      };
+    });
+
+    const statusCounts = [
+      {
+        key: 'published',
+        label: '已生成',
+        count: activePages.filter((page) => page.status === 'published' && !page.edited).length,
+      },
+      {
+        key: 'edited',
+        label: '已编辑',
+        count: activePages.filter((page) => page.edited).length,
+      },
+      {
+        key: 'missing',
+        label: '源文件缺失',
+        count: activePages.filter((page) => page.status === 'missing').length,
+      },
+      {
+        key: 'trash',
+        label: '回收站',
+        count: trashPages.length,
+      },
+    ];
+
+    return {
+      generatedAt: nowIso(),
+      summary: {
+        activeDocuments: activePages.length,
+        publicDocuments: activePages.filter((page) => page.visibility === 'public').length,
+        privateDocuments: activePages.filter((page) => page.visibility === 'private').length,
+        editableDocuments: activePages.filter((page) => isEditableFileType(page.fileType, page.mimeType)).length,
+        trashDocuments: trashPages.length,
+        todayUploads: activePages.filter((page) => analyticsDayKey(page.createdAt) === todayKey).length,
+        todayUpdates: activePages.filter((page) => analyticsDayKey(page.updatedAt) === todayKey && page.edited).length,
+        totalAccess,
+        totalDownloads,
+        totalSize,
+        averageAccess: activePages.length ? Math.round(totalAccess / activePages.length) : 0,
+        averageDownloads: activePages.length ? Math.round(totalDownloads / activePages.length) : 0,
+      },
+      trend: Array.from(trendByDay.values()),
+      byType,
+      visibility: [
+        { key: 'public', label: '公开', count: activePages.filter((page) => page.visibility === 'public').length },
+        { key: 'private', label: '仅自己', count: activePages.filter((page) => page.visibility === 'private').length },
+      ],
+      status: statusCounts,
+      topAccess: [...activePages]
+        .filter((page) => Number(page.accessCount || 0) > 0)
+        .sort((a, b) => Number(b.accessCount || 0) - Number(a.accessCount || 0) || new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        .slice(0, 6)
+        .map(analyticsPageSummary),
+      topDownloads: [...activePages]
+        .filter((page) => Number(page.downloadCount || 0) > 0)
+        .sort((a, b) => Number(b.downloadCount || 0) - Number(a.downloadCount || 0) || new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        .slice(0, 6)
+        .map(analyticsPageSummary),
     };
   }
 

@@ -17,10 +17,14 @@ const icons = {
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-15-6.7L3 13"></path></svg>',
   cloudUpload:
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 13v8"></path><path d="m16 17-4-4-4 4"></path><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path><path d="M16 16h2a4 4 0 0 0 0-8h-.2"></path></svg>',
+  analytics:
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"></path><rect width="3" height="8" x="7" y="9" rx="1"></rect><rect width="3" height="12" x="13" y="5" rx="1"></rect><rect width="3" height="5" x="19" y="12" rx="1"></rect></svg>',
 };
 
 let pages = [];
 let watchDirectories = [];
+let analytics = null;
+let analyticsError = '';
 const defaultSettings = {
   trackingCode: '',
   authUsername: 'admin',
@@ -51,7 +55,10 @@ const supportedFilePattern = /\.(html?|md|markdown|pdf|docx?|pptx?|pptm|ppsx?|ke
 let settings = { ...defaultSettings };
 const initialPath = normalizedPath(window.location.pathname || defaultSettings.adminPath);
 const isSettingsPage = initialPath.endsWith('/settings');
-let adminBasePath = normalizeAdminPath(isSettingsPage ? initialPath.replace(/\/settings$/u, '') : initialPath);
+const isAnalyticsPage = initialPath.endsWith('/analytics');
+let adminBasePath = normalizeAdminPath(
+  isSettingsPage ? initialPath.replace(/\/settings$/u, '') : isAnalyticsPage ? initialPath.replace(/\/analytics$/u, '') : initialPath,
+);
 let session = { authenticated: false, username: '' };
 let activeFilter = 'all';
 let activeType = 'all';
@@ -115,11 +122,23 @@ const els = {
   toast: document.querySelector('#toast'),
   managerView: document.querySelector('#managerView'),
   settingsPage: document.querySelector('#settingsPage'),
+  analyticsPage: document.querySelector('#analyticsPage'),
   adminHomeLink: document.querySelector('#adminHomeLink'),
   adminBrandTitle: document.querySelector('#adminBrandTitle'),
   adminBrandSubtitle: document.querySelector('#adminBrandSubtitle'),
+  openAnalytics: document.querySelector('#openAnalytics'),
   openSettings: document.querySelector('#openSettings'),
   settingsBackLink: document.querySelector('#settingsBackLink'),
+  analyticsBackLink: document.querySelector('#analyticsBackLink'),
+  refreshAnalytics: document.querySelector('#refreshAnalytics'),
+  analyticsMetrics: document.querySelector('#analyticsMetrics'),
+  analyticsTrendBars: document.querySelector('#analyticsTrendBars'),
+  analyticsTypeList: document.querySelector('#analyticsTypeList'),
+  analyticsVisibilityList: document.querySelector('#analyticsVisibilityList'),
+  analyticsStatusList: document.querySelector('#analyticsStatusList'),
+  analyticsTopAccess: document.querySelector('#analyticsTopAccess'),
+  analyticsTopDownloads: document.querySelector('#analyticsTopDownloads'),
+  analyticsGeneratedAt: document.querySelector('#analyticsGeneratedAt'),
   saveSettingsTop: document.querySelector('#saveSettingsTop'),
   siteNameInput: document.querySelector('#siteNameInput'),
   adminNameInput: document.querySelector('#adminNameInput'),
@@ -141,6 +160,10 @@ function normalizeAdminPath(value) {
 
 function settingsUrl() {
   return `${adminBasePath}/settings`;
+}
+
+function analyticsUrl() {
+  return `${adminBasePath}/analytics`;
 }
 
 function managerUrl() {
@@ -174,14 +197,20 @@ function renderShell() {
     els.openSettings.href = settingsUrl();
     els.openSettings.classList.toggle('btn-blue', isSettingsPage);
   }
+  if (els.openAnalytics) {
+    els.openAnalytics.href = analyticsUrl();
+    els.openAnalytics.classList.toggle('btn-blue', isAnalyticsPage);
+  }
   if (els.settingsBackLink) els.settingsBackLink.href = managerUrl();
-  document.title = isSettingsPage ? `${adminName} 系统设置` : `${adminName} 本地文档管理器`;
+  if (els.analyticsBackLink) els.analyticsBackLink.href = managerUrl();
+  document.title = isAnalyticsPage ? `${adminName} 数据分析` : isSettingsPage ? `${adminName} 系统设置` : `${adminName} 本地文档管理器`;
 }
 
 function applyView() {
-  if (els.managerView) els.managerView.hidden = isSettingsPage;
+  if (els.managerView) els.managerView.hidden = isSettingsPage || isAnalyticsPage;
   if (els.settingsPage) els.settingsPage.hidden = !isSettingsPage;
-  document.body.dataset.view = isSettingsPage ? 'settings' : 'manager';
+  if (els.analyticsPage) els.analyticsPage.hidden = !isAnalyticsPage;
+  document.body.dataset.view = isAnalyticsPage ? 'analytics' : isSettingsPage ? 'settings' : 'manager';
   renderShell();
 }
 
@@ -217,6 +246,18 @@ function formatSize(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return '1 KB';
   if (bytes < 1024) return `${bytes} B`;
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+function formatBytes(bytes) {
+  const value = Number(bytes || 0);
+  if (!Number.isFinite(value) || value <= 0) return '0 KB';
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${Math.max(1, Math.round(value / 1024))} KB`;
+  return `${(value / 1024 / 1024).toFixed(value >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat('zh-CN').format(Number(value || 0));
 }
 
 function displayId(page, index = pages.findIndex((item) => item.id === page.id)) {
@@ -358,15 +399,25 @@ async function loadData({ preserveScroll = false } = {}) {
     params.set('status', activeFilter);
   }
   try {
-    const [pageData, watchData, settingsData] = await Promise.all([
+    const analyticsRequest = isAnalyticsPage
+      ? api('/api/analytics')
+          .then((data) => ({ analytics: data.analytics || null, error: '' }))
+          .catch((error) => ({ analytics: null, error: `统计加载失败：${error.message || '请稍后重试'}` }))
+      : Promise.resolve({ analytics, error: '' });
+    const [pageData, watchData, settingsData, analyticsData] = await Promise.all([
       api(`/api/pages?${params.toString()}`),
       api('/api/watch-dirs'),
       api('/api/settings'),
+      analyticsRequest,
     ]);
     if (requestId !== loadDataRequestId) return;
     pages = pageData.pages || [];
     pagination = { ...pagination, ...(pageData.pagination || {}) };
     watchDirectories = watchData.watchDirs || [];
+    if (isAnalyticsPage) {
+      analytics = analyticsData.analytics || null;
+      analyticsError = analyticsData.error || '';
+    }
     applySettings(settingsData.settings);
     render();
     restoreListViewport(viewport);
@@ -482,10 +533,126 @@ function renderTypeTabs() {
   });
 }
 
+function renderAnalyticsMetrics(summary = {}) {
+  if (!els.analyticsMetrics) return;
+  const metrics = [
+    { label: '收录文档', value: summary.activeDocuments, detail: `公开 ${formatNumber(summary.publicDocuments)}，私有 ${formatNumber(summary.privateDocuments)}` },
+    { label: '总访问数', value: summary.totalAccess, detail: `单文档均值 ${formatNumber(summary.averageAccess)}` },
+    { label: '总下载数', value: summary.totalDownloads, detail: `单文档均值 ${formatNumber(summary.averageDownloads)}` },
+    { label: '可编辑文档', value: summary.editableDocuments, detail: `今日上传 ${formatNumber(summary.todayUploads)}` },
+    { label: '今日更新', value: summary.todayUpdates, detail: '按已编辑文档更新时间统计' },
+    { label: '占用空间', value: formatBytes(summary.totalSize), detail: `回收站 ${formatNumber(summary.trashDocuments)}` },
+  ];
+  els.analyticsMetrics.innerHTML = metrics
+    .map(
+      (item) => `<div class="analytics-kpi">
+        <span>${escapeHtml(item.label)}</span>
+        <strong>${escapeHtml(item.value ?? 0)}</strong>
+        <small>${escapeHtml(item.detail || '')}</small>
+      </div>`,
+    )
+    .join('');
+}
+
+function renderAnalyticsTrend(trend = []) {
+  if (!els.analyticsTrendBars) return;
+  const rows = Array.isArray(trend) ? trend : [];
+  const maxValue = Math.max(1, ...rows.map((item) => Number(item.uploads || 0) + Number(item.updates || 0)));
+  els.analyticsTrendBars.innerHTML = rows
+    .map((item) => {
+      const uploads = Number(item.uploads || 0);
+      const updates = Number(item.updates || 0);
+      const uploadHeight = Math.max(uploads ? 8 : 0, Math.round((uploads / maxValue) * 116));
+      const updateHeight = Math.max(updates ? 8 : 0, Math.round((updates / maxValue) * 116));
+      return `<div class="trend-day" title="${escapeHtml(item.key || '')} 上传 ${uploads}，编辑 ${updates}">
+        <div class="trend-stack" aria-label="${escapeHtml(item.label || '')} 上传 ${uploads}，编辑 ${updates}">
+          <span class="trend-bar trend-bar-update" style="height:${updateHeight}px"></span>
+          <span class="trend-bar trend-bar-upload" style="height:${uploadHeight}px"></span>
+        </div>
+        <span class="trend-label">${escapeHtml(item.label || '-')}</span>
+      </div>`;
+    })
+    .join('');
+}
+
+function renderAnalyticsRankList(element, rows = [], metricKey = 'accessCount', emptyText = '暂无数据') {
+  if (!element) return;
+  const items = (Array.isArray(rows) ? rows : []).filter((item) => Number(item[metricKey] || 0) > 0);
+  if (!items.length) {
+    element.innerHTML = `<div class="analytics-empty">${escapeHtml(emptyText)}</div>`;
+    return;
+  }
+  const maxValue = Math.max(1, ...items.map((item) => Number(item[metricKey] || 0)));
+  element.innerHTML = items
+    .map((item) => {
+      const value = Number(item[metricKey] || 0);
+      const width = Math.max(3, Math.round((value / maxValue) * 100));
+      return `<a class="analytics-row analytics-row-link" href="${escapeHtml(item.url || '#')}" target="_blank" rel="noreferrer">
+        <span class="badge ${fileTypeBadgeClassFromType(item.fileType)}">${fileTypeLabelFromType(item.fileType)}</span>
+        <span class="analytics-row-main">
+          <strong title="${escapeHtml(item.title)}">${escapeHtml(item.title || item.fileName || item.slug)}</strong>
+          <small>${escapeHtml(item.fileName || item.slug || '-')}</small>
+          <span class="analytics-meter"><i style="width:${width}%"></i></span>
+        </span>
+        <span class="analytics-number">${formatNumber(value)}</span>
+      </a>`;
+    })
+    .join('');
+}
+
+function renderAnalyticsBreakdown(element, rows = [], { typeBadges = false } = {}) {
+  if (!element) return;
+  const items = Array.isArray(rows) ? rows : [];
+  const maxCount = Math.max(1, ...items.map((item) => Number(item.count || 0)));
+  element.innerHTML = items
+    .map((item) => {
+      const count = Number(item.count || 0);
+      const width = Math.max(count ? 4 : 0, Math.round((count / maxCount) * 100));
+      const label = typeBadges ? fileTypeLabelFromType(item.type) : item.label || item.key;
+      const badge = typeBadges ? `<span class="badge ${fileTypeBadgeClassFromType(item.type)}">${escapeHtml(label)}</span>` : `<strong>${escapeHtml(label)}</strong>`;
+      const subline = typeBadges ? `${formatNumber(item.access)} 访问，${formatNumber(item.downloads)} 下载，${formatBytes(item.size)}` : `${formatNumber(item.count)} 个文档`;
+      return `<div class="analytics-row">
+        ${badge}
+        <span class="analytics-row-main">
+          <small>${escapeHtml(subline)}</small>
+          <span class="analytics-meter"><i style="width:${width}%"></i></span>
+        </span>
+        <span class="analytics-number">${formatNumber(count)}</span>
+      </div>`;
+    })
+    .join('');
+}
+
+function renderAnalytics() {
+  if (!els.analyticsPage) return;
+  const data = analytics || {
+    generatedAt: '',
+    summary: {},
+    trend: [],
+    byType: [],
+    visibility: [],
+    status: [],
+    topAccess: [],
+    topDownloads: [],
+  };
+  renderAnalyticsMetrics(data.summary || {});
+  renderAnalyticsTrend(data.trend || []);
+  renderAnalyticsBreakdown(els.analyticsTypeList, data.byType || [], { typeBadges: true });
+  renderAnalyticsBreakdown(els.analyticsVisibilityList, data.visibility || []);
+  renderAnalyticsBreakdown(els.analyticsStatusList, data.status || []);
+  renderAnalyticsRankList(els.analyticsTopAccess, data.topAccess || [], 'accessCount', '暂无访问数据');
+  renderAnalyticsRankList(els.analyticsTopDownloads, data.topDownloads || [], 'downloadCount', '暂无下载数据');
+  if (els.analyticsGeneratedAt) {
+    els.analyticsGeneratedAt.classList.toggle('badge-warning', Boolean(analyticsError));
+    els.analyticsGeneratedAt.textContent = analyticsError || (data.generatedAt ? `更新时间：${new Date(data.generatedAt).toLocaleString('zh-CN')}` : '等待加载');
+  }
+}
+
 function render() {
   renderWatchDirectories();
   renderSettings();
   renderTypeTabs();
+  renderAnalytics();
   els.rows.innerHTML = pages
     .map((page, index) => {
       const trashed = Boolean(page.deletedAt);
@@ -1068,6 +1235,7 @@ document.querySelector('#addWatchDirectory')?.addEventListener('click', () => {
 });
 document.querySelector('#addSample').addEventListener('click', () => addSamples().catch((error) => showToast(error.message)));
 document.querySelector('#refreshList').addEventListener('click', () => loadData().then(() => showToast('列表已刷新')));
+els.refreshAnalytics?.addEventListener('click', () => loadData().then(() => showToast(analyticsError || '数据分析已刷新')));
 
 els.fileInput.addEventListener('change', (event) => {
   uploadFiles(event.target.files).catch((error) => showToast(error.message));
@@ -1170,6 +1338,10 @@ els.watchList.addEventListener('click', async (event) => {
 document.querySelector('#openSettings').addEventListener('click', (event) => {
   event.preventDefault();
   window.location.href = settingsUrl();
+});
+document.querySelector('#openAnalytics')?.addEventListener('click', (event) => {
+  event.preventDefault();
+  window.location.href = analyticsUrl();
 });
 document.querySelector('#openSettingsSide')?.addEventListener('click', () => {
   document.querySelector('#watchDirInput')?.focus();

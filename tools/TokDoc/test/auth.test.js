@@ -65,6 +65,10 @@ test('requires login for management APIs and keeps a long-lived session cookie',
   assert.equal(adminSettings.statusCode, 200);
   assert.match(adminSettings.body, /id="settingsPage"/);
 
+  const adminAnalytics = await app.inject({ method: 'GET', url: '/admin/analytics' });
+  assert.equal(adminAnalytics.statusCode, 200);
+  assert.match(adminAnalytics.body, /id="analyticsPage"/);
+
   const health = await app.inject({ method: 'GET', url: '/api/health' });
   assert.equal(health.statusCode, 200);
   assert.equal(health.json().name, 'tokdoc');
@@ -75,6 +79,9 @@ test('requires login for management APIs and keeps a long-lived session cookie',
 
   const denied = await app.inject({ method: 'GET', url: '/api/pages' });
   assert.equal(denied.statusCode, 401);
+
+  const analyticsDenied = await app.inject({ method: 'GET', url: '/api/analytics' });
+  assert.equal(analyticsDenied.statusCode, 401);
 
   const login = await app.inject({
     method: 'POST',
@@ -87,6 +94,10 @@ test('requires login for management APIs and keeps a long-lived session cookie',
 
   const pages = await app.inject({ method: 'GET', url: '/api/pages', headers: { cookie: sessionCookie(login) } });
   assert.equal(pages.statusCode, 200);
+
+  const analytics = await app.inject({ method: 'GET', url: '/api/analytics', headers: { cookie: sessionCookie(login) } });
+  assert.equal(analytics.statusCode, 200);
+  assert.equal(typeof analytics.json().analytics.summary.activeDocuments, 'number');
 
   const legacyPages = await app.inject({ method: 'GET', url: '/api/pages', headers: { cookie: legacySessionCookie(login) } });
   assert.equal(legacyPages.statusCode, 200);
@@ -245,6 +256,9 @@ test('moves the management console and APIs under a custom admin path', async (t
   const oldAdminSettings = await app.inject({ method: 'GET', url: '/admin/settings' });
   assert.equal(oldAdminSettings.statusCode, 404);
 
+  const oldAdminAnalytics = await app.inject({ method: 'GET', url: '/admin/analytics' });
+  assert.equal(oldAdminAnalytics.statusCode, 404);
+
   const oldLogin = await app.inject({
     method: 'POST',
     url: '/api/login',
@@ -263,6 +277,10 @@ test('moves the management console and APIs under a custom admin path', async (t
   assert.equal(customSettings.statusCode, 200);
   assert.match(customSettings.body, /id="settingsPage"/);
 
+  const customAnalytics = await app.inject({ method: 'GET', url: '/tok-ops/analytics' });
+  assert.equal(customAnalytics.statusCode, 200);
+  assert.match(customAnalytics.body, /id="analyticsPage"/);
+
   const customLogin = await app.inject({
     method: 'POST',
     url: '/tok-ops/api/login',
@@ -273,6 +291,9 @@ test('moves the management console and APIs under a custom admin path', async (t
 
   const customPages = await app.inject({ method: 'GET', url: '/tok-ops/api/pages', headers: { cookie: customCookie } });
   assert.equal(customPages.statusCode, 200);
+
+  const customAnalyticsApi = await app.inject({ method: 'GET', url: '/tok-ops/api/analytics', headers: { cookie: customCookie } });
+  assert.equal(customAnalyticsApi.statusCode, 200);
 
   const page = await app.store.importBuffer({
     fileName: 'custom-admin-page.html',
@@ -421,24 +442,35 @@ test('serves a public document index and filters public API fields without login
 
   const presentationView = await app.inject({ method: 'GET', url: presentationPage.url });
   assert.equal(presentationView.statusCode, 200);
-  assert.match(presentationView.headers['content-type'], /application\/pdf/);
-  assert.match(presentationView.body, /converted:public-index-deck\.pptx/);
+  assert.match(presentationView.headers['content-type'], /text\/html/);
+  assert.match(presentationView.body, /class="reader-shell"/);
+  assert.match(presentationView.body, new RegExp(`/pages/${presentationPage.slug}/file`));
+  assert.match(presentationView.body, new RegExp(`${presentationPage.url}/download`));
+
+  const presentationFile = await app.inject({ method: 'GET', url: `/pages/${presentationPage.slug}/file` });
+  assert.equal(presentationFile.statusCode, 200);
+  assert.match(presentationFile.headers['content-type'], /application\/pdf/);
+  assert.match(presentationFile.headers['content-disposition'], /inline/);
+  assert.match(presentationFile.body, /converted:public-index-deck\.pptx/);
 
   const markdownView = await app.inject({ method: 'GET', url: markdownPage.url });
   assert.equal(markdownView.statusCode, 200);
   assert.match(markdownView.headers['content-type'], /text\/html/);
   assert.match(markdownView.body, /<h1>公开索引 Markdown<\/h1>/);
+  assert.match(markdownView.body, /data-tokdoc-reader-toolbar/);
 
   const wordView = await app.inject({ method: 'GET', url: wordPage.url });
   assert.equal(wordView.statusCode, 200);
   assert.match(wordView.headers['content-type'], /text\/html/);
   assert.match(wordView.body, /class="tokdoc-word-shell"/);
+  assert.match(wordView.body, /data-tokdoc-reader-toolbar/);
 
   const spreadsheetView = await app.inject({ method: 'GET', url: spreadsheetPage.url });
   assert.equal(spreadsheetView.statusCode, 200);
   assert.match(spreadsheetView.headers['content-type'], /text\/html/);
   assert.match(spreadsheetView.body, /class="sheet-app"/);
   assert.match(spreadsheetView.body, /预算表/);
+  assert.match(spreadsheetView.body, /data-tokdoc-reader-toolbar/);
 
   const login = await app.inject({
     method: 'POST',
@@ -450,9 +482,11 @@ test('serves a public document index and filters public API fields without login
   const markdownEdit = await app.inject({ method: 'GET', url: `${markdownPage.url}?edit=1`, headers: { cookie: sessionCookie(login) } });
   assert.equal(markdownEdit.statusCode, 200);
   assert.match(markdownEdit.body, /tokdoc-edit-panel/);
+  assert.doesNotMatch(markdownEdit.body, /data-tokdoc-reader-toolbar/);
   const wordEdit = await app.inject({ method: 'GET', url: `${wordPage.url}?edit=1`, headers: { cookie: sessionCookie(login) } });
   assert.equal(wordEdit.statusCode, 200);
   assert.match(wordEdit.body, /tokdoc-edit-panel/);
+  assert.doesNotMatch(wordEdit.body, /data-tokdoc-reader-toolbar/);
 
   const searched = await app.inject({ method: 'GET', url: '/public/api/pages?q=PDF' });
   assert.equal(searched.statusCode, 200);
@@ -719,14 +753,34 @@ test('serves uploaded PDF documents publicly and blocks edit mode for non-HTML a
     relativePath: 'reports/public-report.pdf',
     buffer: Buffer.from('%PDF-1.4\npublic report\n'),
   });
+  const privatePage = await app.store.importBuffer({
+    fileName: 'private-report.pdf',
+    relativePath: 'reports/private-report.pdf',
+    buffer: Buffer.from('%PDF-1.4\nprivate report\n'),
+    visibility: 'private',
+  });
 
   const publicView = await app.inject({ method: 'GET', url: page.url });
   assert.equal(publicView.statusCode, 200);
-  assert.match(publicView.headers['content-type'], /application\/pdf/);
-  assert.match(publicView.headers['content-disposition'], /inline/);
-  assert.match(publicView.body, /^%PDF-1\.4/);
+  assert.match(publicView.headers['content-type'], /text\/html/);
+  assert.match(publicView.body, /class="reader-shell"/);
+  assert.match(publicView.body, new RegExp(`/pages/${page.slug}/file`));
+  assert.match(publicView.body, new RegExp(`${page.url}/download`));
   assert.equal(app.store.getPage(page.id).accessCount, 1);
   assert.equal(app.store.getPage(page.id).downloadCount, 0);
+
+  const publicFile = await app.inject({ method: 'GET', url: `/pages/${page.slug}/file` });
+  assert.equal(publicFile.statusCode, 200);
+  assert.match(publicFile.headers['content-type'], /application\/pdf/);
+  assert.match(publicFile.headers['content-disposition'], /inline/);
+  assert.match(publicFile.body, /^%PDF-1\.4/);
+  assert.equal(app.store.getPage(page.id).accessCount, 1);
+  assert.equal(app.store.getPage(page.id).downloadCount, 0);
+
+  const deniedPrivateView = await app.inject({ method: 'GET', url: privatePage.url });
+  assert.equal(deniedPrivateView.statusCode, 404);
+  const deniedPrivateFile = await app.inject({ method: 'GET', url: `/pages/${privatePage.slug}/file` });
+  assert.equal(deniedPrivateFile.statusCode, 404);
 
   const publicDownload = await app.inject({ method: 'GET', url: `${page.url}/download` });
   assert.equal(publicDownload.statusCode, 200);
@@ -751,6 +805,14 @@ test('serves uploaded PDF documents publicly and blocks edit mode for non-HTML a
   assert.match(downloaded.headers['content-disposition'], /attachment/);
   assert.match(downloaded.body, /^%PDF-1\.4/);
   assert.equal(app.store.getPage(page.id).downloadCount, 2);
+
+  const privateFile = await app.inject({
+    method: 'GET',
+    url: `/pages/${privatePage.slug}/file`,
+    headers: { cookie: sessionCookie(login) },
+  });
+  assert.equal(privateFile.statusCode, 200);
+  assert.match(privateFile.body, /^%PDF-1\.4/);
 
   const editDenied = await app.inject({ method: 'GET', url: `${page.url}?edit=1`, headers: { cookie: sessionCookie(login) } });
   assert.equal(editDenied.statusCode, 400);
@@ -821,8 +883,13 @@ test('serves generated documents when stored paths still point to Docker data di
 
   const publicView = await app.inject({ method: 'GET', url: page.url });
   assert.equal(publicView.statusCode, 200);
-  assert.match(publicView.headers['content-type'], /application\/pdf/);
-  assert.match(publicView.body, /^%PDF-1\.4/);
+  assert.match(publicView.headers['content-type'], /text\/html/);
+  assert.match(publicView.body, /class="reader-shell"/);
+
+  const publicFile = await app.inject({ method: 'GET', url: `/pages/${page.slug}/file` });
+  assert.equal(publicFile.statusCode, 200);
+  assert.match(publicFile.headers['content-type'], /application\/pdf/);
+  assert.match(publicFile.body, /^%PDF-1\.4/);
 });
 
 test('allows changing login username and password from settings', async (t) => {
