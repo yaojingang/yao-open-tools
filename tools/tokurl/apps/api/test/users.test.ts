@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AuthUser } from "../src/services/auth.js";
-import { canResetUserPassword, canUpdateUserProfile, deleteUser, loginSchema, registerSchema, toPublicUser } from "../src/services/users.js";
+import { hashPassword, type AuthUser } from "../src/services/auth.js";
+import { canResetUserPassword, canUpdateUserProfile, deleteUser, loginSchema, loginUser, registerSchema, toPublicUser, updateUser } from "../src/services/users.js";
 import type { UserRecord } from "../src/db/schema.js";
 import type { DbClient } from "../src/db/client.js";
 
@@ -26,6 +26,7 @@ function userRecord(overrides: Partial<UserRecord> = {}): UserRecord {
     passwordHash: "hash",
     role: "user",
     isActive: true,
+    sessionVersion: 0,
     createdAt: new Date("2026-06-12T00:00:00.000Z"),
     updatedAt: new Date("2026-06-12T00:00:00.000Z"),
     lastLoginAt: null,
@@ -45,22 +46,58 @@ function createDeleteUserDbMock(options: { target: UserRecord | null; remainingA
   const returning = vi.fn(async () => (options.target ? [options.target] : []));
   const whereDelete = vi.fn(() => ({ returning }));
   const deleteFn = vi.fn(() => ({ where: whereDelete }));
+  const execute = vi.fn(async () => []);
+  const transaction = vi.fn(async (operation: (transaction: DbClient) => Promise<unknown>) => operation(db));
+  const db = {
+    select,
+    update,
+    delete: deleteFn,
+    execute,
+    transaction
+  } as unknown as DbClient;
 
   return {
-    db: {
-      select,
-      update,
-      delete: deleteFn
-    } as unknown as DbClient,
+    db,
     mocks: {
       select,
       update,
       set,
       updateWhere,
       deleteFn,
-      returning
+      returning,
+      execute,
+      transaction
     }
   };
+}
+
+function createLoginDbMock(record: UserRecord) {
+  const limit = vi.fn(async () => [record]);
+  const where = vi.fn(() => ({ limit }));
+  const from = vi.fn(() => ({ where }));
+  const select = vi.fn(() => ({ from }));
+  const update = vi.fn();
+
+  return {
+    db: { select, update } as unknown as DbClient,
+    update
+  };
+}
+
+function createUpdateUserDbMock(target: UserRecord) {
+  const limit = vi.fn(async () => [target]);
+  const whereSelect = vi.fn(() => ({ limit }));
+  const from = vi.fn(() => ({ where: whereSelect }));
+  const select = vi.fn(() => ({ from }));
+  const returning = vi.fn(async () => [{ ...target, isActive: false, sessionVersion: target.sessionVersion + 1 }]);
+  const whereUpdate = vi.fn(() => ({ returning }));
+  const set = vi.fn(() => ({ where: whereUpdate }));
+  const update = vi.fn(() => ({ set }));
+  const execute = vi.fn(async () => []);
+  const transaction = vi.fn(async (operation: (transaction: DbClient) => Promise<unknown>) => operation(db));
+  const db = { select, update, execute, transaction } as unknown as DbClient;
+
+  return { db, mocks: { set, execute, transaction } };
 }
 
 describe("username credentials", () => {
@@ -108,6 +145,44 @@ describe("user management permissions", () => {
     expect(canUpdateUserProfile(user, user.id, { role: "admin" })).toBe(false);
     expect(canUpdateUserProfile(user, user.id, { isActive: false })).toBe(false);
     expect(canResetUserPassword(user, "other-id")).toBe(false);
+  });
+});
+
+describe("disabled account access", () => {
+  it("rejects login for an inactive user without updating login metadata", async () => {
+    const { db, update } = createLoginDbMock(userRecord({ isActive: false }));
+
+    await expect(loginUser({ db, config: {} as never }, { username: "alice", password: "tokurl-pass" })).rejects.toMatchObject({
+      statusCode: 401,
+      code: "invalid_credentials"
+    });
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("increments the session version while disabling an account under the admin invariant lock", async () => {
+    const { db, mocks } = createUpdateUserDbMock(userRecord());
+
+    await expect(updateUser({ db, config: {} as never }, user.id, { isActive: false })).resolves.toMatchObject({
+      id: user.id,
+      isActive: false
+    });
+    expect(mocks.transaction).toHaveBeenCalledTimes(1);
+    expect(mocks.execute).toHaveBeenCalledTimes(1);
+    expect(mocks.set).toHaveBeenCalledWith(expect.objectContaining({ isActive: false, sessionVersion: expect.anything() }));
+  });
+
+  it("rejects login when the account changes after password verification", async () => {
+    const record = userRecord({ passwordHash: await hashPassword("test-password") });
+    const select = vi.fn(() => ({ from: () => ({ where: () => ({ limit: async () => [record] }) }) }));
+    const returning = vi.fn(async () => []);
+    const update = vi.fn(() => ({ set: () => ({ where: () => ({ returning }) }) }));
+    const db = { select, update } as unknown as DbClient;
+
+    await expect(loginUser({ db, config: {} as never }, { username: "alice", password: "test-password" })).rejects.toMatchObject({
+      statusCode: 401,
+      code: "invalid_credentials"
+    });
+    expect(returning).toHaveBeenCalledTimes(1);
   });
 });
 

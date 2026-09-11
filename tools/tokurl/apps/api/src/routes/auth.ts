@@ -4,6 +4,7 @@ import type { AppConfig } from "../config.js";
 import type { DbClient } from "../db/client.js";
 import { createAuthGuard, getSessionCookieOptions, sessionCookieName, signSession } from "../services/auth.js";
 import { releaseDailyRegistrationSlot, reserveDailyRegistrationSlot, type RegistrationReservation } from "../services/registration-limit.js";
+import { assertRegistrationAllowed } from "../services/settings.js";
 import { loginSchema, loginUser, registerSchema, registerUser } from "../services/users.js";
 import { parseRequest, sendError } from "./http.js";
 
@@ -25,6 +26,7 @@ export async function registerAuthRoutes(app: FastifyInstance, context: RouteCon
     let registered = false;
 
     try {
+      await assertRegistrationAllowed(services);
       const body = parseRequest(registerSchema, request.body);
       reservation = await reserveDailyRegistrationSlot(context.redis, {
         ip: request.ip,
@@ -32,9 +34,9 @@ export async function registerAuthRoutes(app: FastifyInstance, context: RouteCon
         userAgent: request.headers["user-agent"],
         hashSalt: context.config.hashSalt
       });
-      const { user, authUser } = await registerUser(services, body);
+      const { user, authUser, sessionVersion } = await registerUser(services, body);
       registered = true;
-      const token = await signSession(authUser, context.config.authSecret);
+      const token = await signSession(authUser, context.config.authSecret, sessionVersion);
 
       return reply.setCookie(sessionCookieName, token, getSessionCookieOptions(context.config)).status(201).send({ user });
     } catch (error) {
@@ -49,8 +51,9 @@ export async function registerAuthRoutes(app: FastifyInstance, context: RouteCon
   app.post("/api/auth/login", async (request, reply) => {
     try {
       const body = parseRequest(loginSchema, request.body);
-      const user = await loginUser(services, body);
-      const token = await signSession(user, context.config.authSecret);
+      const sessionUser = await loginUser(services, body);
+      const token = await signSession(sessionUser, context.config.authSecret, sessionUser.sessionVersion);
+      const { sessionVersion: _sessionVersion, ...user } = sessionUser;
 
       return reply.setCookie(sessionCookieName, token, getSessionCookieOptions(context.config)).send({ user });
     } catch (error) {

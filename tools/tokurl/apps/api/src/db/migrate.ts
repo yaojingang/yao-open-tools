@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import { loadConfig } from "../config.js";
 import { createDb } from "./client.js";
 
+const migrationsLockKey = 7_910_000;
+
 async function findMigrationsDir(): Promise<string> {
   const currentFile = fileURLToPath(import.meta.url);
   const candidates = [
@@ -29,31 +31,36 @@ export async function runMigrations() {
   const { sql } = createDb(config.databaseUrl);
 
   try {
-    await sql`
-      create table if not exists schema_migrations (
-        name text primary key,
-        applied_at timestamptz not null default now()
-      )
-    `;
-
     const migrationsDir = await findMigrationsDir();
     const files = (await readdir(migrationsDir)).filter((file) => file.endsWith(".sql")).sort();
+    const appliedFiles: string[] = [];
 
-    for (const file of files) {
-      const applied = await sql<{ name: string }[]>`
-        select name from schema_migrations where name = ${file} limit 1
+    await sql.begin(async (transaction) => {
+      await transaction`select pg_advisory_xact_lock(${migrationsLockKey})`;
+      await transaction`
+        create table if not exists schema_migrations (
+          name text primary key,
+          applied_at timestamptz not null default now()
+        )
       `;
 
-      if (applied.length > 0) {
-        continue;
-      }
+      for (const file of files) {
+        const applied = await transaction<{ name: string }[]>`
+          select name from schema_migrations where name = ${file} limit 1
+        `;
 
-      const migrationSql = await readFile(path.join(migrationsDir, file), "utf8");
-      await sql.begin(async (transaction) => {
+        if (applied.length > 0) {
+          continue;
+        }
+
+        const migrationSql = await readFile(path.join(migrationsDir, file), "utf8");
         await transaction.unsafe(migrationSql);
         await transaction`insert into schema_migrations (name) values (${file})`;
-      });
+        appliedFiles.push(file);
+      }
+    });
 
+    for (const file of appliedFiles) {
       console.log(`Applied migration ${file}`);
     }
   } finally {
@@ -61,7 +68,7 @@ export async function runMigrations() {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   runMigrations().catch((error) => {
     console.error(error);
     process.exit(1);

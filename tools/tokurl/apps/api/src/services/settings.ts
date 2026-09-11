@@ -1,6 +1,8 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import type { AppConfig } from "../config.js";
 import type { DbClient } from "../db/client.js";
+import { registrationLockKey, withAdvisoryTransactionLock } from "../db/locks.js";
 import { siteSettings, type SiteSettingsRecord } from "../db/schema.js";
 import { ServiceError } from "../utils/errors.js";
 
@@ -16,6 +18,7 @@ export const defaultSiteSettings = {
   seoDescription: "极速生成、全球跳转、实时统计、开源自部署的短链工具。",
   seoKeywords: "TokURL,短链接,短链,链接管理,二维码,数据统计",
   analyticsCode: "",
+  registrationEnabled: true,
   redirectAnalyticsEnabled: false
 };
 
@@ -26,6 +29,7 @@ export const updateSiteSettingsSchema = z
     seoDescription: z.string().trim().max(300).optional(),
     seoKeywords: z.string().trim().max(300).optional(),
     analyticsCode: z.string().max(12_000).optional(),
+    registrationEnabled: z.boolean().optional(),
     redirectAnalyticsEnabled: z.boolean().optional()
   })
   .refine((value) => Object.keys(value).length > 0, {
@@ -45,6 +49,7 @@ export function toPublicSiteSettings(settings: SiteSettingsRecord) {
     seoDescription: settings.seoDescription,
     seoKeywords: settings.seoKeywords,
     analyticsCode: settings.analyticsCode,
+    registrationEnabled: settings.registrationEnabled,
     redirectAnalyticsEnabled: settings.redirectAnalyticsEnabled,
     updatedAt: settings.updatedAt.toISOString()
   };
@@ -64,16 +69,11 @@ export async function getSiteSettings(services: SettingsServices) {
   return toPublicSiteSettings(settings ?? toDefaultRecord());
 }
 
-export async function updateSiteSettings(services: SettingsServices, input: SiteSettingsInput) {
-  const current = await getSiteSettings(services);
+async function persistSiteSettings(services: SettingsServices, input: SiteSettingsInput) {
   const now = new Date();
   const next = {
-    siteName: input.siteName ?? current.siteName,
-    seoTitle: input.seoTitle ?? current.seoTitle,
-    seoDescription: input.seoDescription ?? current.seoDescription,
-    seoKeywords: input.seoKeywords ?? current.seoKeywords,
-    analyticsCode: input.analyticsCode ?? current.analyticsCode,
-    redirectAnalyticsEnabled: input.redirectAnalyticsEnabled ?? current.redirectAnalyticsEnabled,
+    ...defaultSiteSettings,
+    ...input,
     updatedAt: now
   };
 
@@ -85,7 +85,7 @@ export async function updateSiteSettings(services: SettingsServices, input: Site
     })
     .onConflictDoUpdate({
       target: siteSettings.id,
-      set: next
+      set: { ...input, updatedAt: now }
     })
     .returning();
 
@@ -94,4 +94,18 @@ export async function updateSiteSettings(services: SettingsServices, input: Site
   }
 
   return toPublicSiteSettings(updated);
+}
+
+export async function updateSiteSettings(services: SettingsServices, input: SiteSettingsInput) {
+  if (input.registrationEnabled === undefined) {
+    return persistSiteSettings(services, input);
+  }
+
+  return withAdvisoryTransactionLock(services.db, registrationLockKey, (db) => persistSiteSettings({ db }, input));
+}
+
+export async function assertRegistrationAllowed(services: SettingsServices & { config: AppConfig }) {
+  if (!services.config.allowRegistration || !(await getSiteSettings(services)).registrationEnabled) {
+    throw new ServiceError(403, "Registration is disabled.", "registration_disabled");
+  }
 }

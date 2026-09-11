@@ -74,6 +74,7 @@ const AUTHOR_PROFILE_URL = "https://x.com/yaojingang";
 const GITHUB_REPOSITORY_URL = "https://github.com/yaojingang/yao-open-tools/tree/main/tools/tokurl";
 const ANALYTICS_ALL_VALUE = "all";
 const LINKS_PAGE_SIZE = 10;
+const ACCOUNT_ACCESS_PAGE_SIZE = 20;
 const SITE_ANALYTICS_NODE_ATTRIBUTE = "data-tokurl-site-analytics";
 const VIEW_PATHS: Record<View, string> = {
   create: "/",
@@ -129,6 +130,7 @@ interface SiteSettingsFormState {
   seoDescription: string;
   seoKeywords: string;
   analyticsCode: string;
+  registrationEnabled: boolean;
   redirectAnalyticsEnabled: boolean;
 }
 
@@ -165,6 +167,7 @@ const emptySiteSettingsForm: SiteSettingsFormState = {
   seoDescription: "",
   seoKeywords: "",
   analyticsCode: "",
+  registrationEnabled: true,
   redirectAnalyticsEnabled: false
 };
 
@@ -451,6 +454,8 @@ export default function App() {
   const [authForm, setAuthForm] = useState<AuthFormState>(emptyAuthForm);
   const [search, setSearch] = useState("");
   const [userSearch, setUserSearch] = useState("");
+  const [accountAccessSearch, setAccountAccessSearch] = useState("");
+  const [accountAccessPage, setAccountAccessPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<LinkStatusFilter>("all");
   const [linksPage, setLinksPage] = useState(1);
   const [rangeFilter, setRangeFilter] = useState<RangeFilter>("7d");
@@ -473,6 +478,8 @@ export default function App() {
   const [pendingCreateAfterAuth, setPendingCreateAfterAuth] = useState(false);
   const [copiedValue, setCopiedValue] = useState<string | null>(null);
   const [toast, setToast] = useState<{ id: number; message: string } | null>(null);
+  const savedRegistrationEnabledRef = useRef(emptySiteSettingsForm.registrationEnabled);
+  const registrationEnabledDirtyRef = useRef(false);
   const copiedTimerRef = useRef<number | null>(null);
   const analyticsInitialPageViewRef = useRef(false);
   const t = messages[locale];
@@ -537,14 +544,16 @@ export default function App() {
       return;
     }
 
-    setSiteSettingsForm({
+    savedRegistrationEnabledRef.current = settings.registrationEnabled;
+    setSiteSettingsForm((current) => ({
       siteName: settings.siteName,
       seoTitle: settings.seoTitle,
       seoDescription: settings.seoDescription,
       seoKeywords: settings.seoKeywords,
       analyticsCode: settings.analyticsCode,
+      registrationEnabled: registrationEnabledDirtyRef.current ? current.registrationEnabled : settings.registrationEnabled,
       redirectAnalyticsEnabled: settings.redirectAnalyticsEnabled
-    });
+    }));
   }, [configQuery.data?.siteSettings]);
 
   useEffect(() => {
@@ -619,6 +628,21 @@ export default function App() {
     retry: false
   });
 
+  const accountAccessQuery = useQuery({
+    queryKey: ["users", "account-access", token, accountAccessSearch, accountAccessPage],
+    queryFn: () => listUsers(token, accountAccessSearch, {
+      limit: ACCOUNT_ACCESS_PAGE_SIZE,
+      offset: (accountAccessPage - 1) * ACCOUNT_ACCESS_PAGE_SIZE,
+      excludeCurrentUser: true
+    }),
+    enabled: view === "settings" && settingsTab === "site" && isAdmin,
+    retry: false
+  });
+
+  useEffect(() => {
+    setAccountAccessPage(1);
+  }, [accountAccessSearch]);
+
   useEffect(() => {
     const allowedUserIds = new Set((usersQuery.data?.items ?? []).filter((user) => user.id !== currentUser?.id).map((user) => user.id));
     setSelectedUserIds((current) => {
@@ -643,6 +667,11 @@ export default function App() {
   const linksPageStart = linksTotal === 0 ? 0 : (linksPage - 1) * LINKS_PAGE_SIZE + 1;
   const linksPageEnd = Math.min(linksPage * LINKS_PAGE_SIZE, linksTotal);
   const paginationItems = getPaginationItems(Math.min(linksPage, linksPageCount), linksPageCount);
+  const accountAccessTotal = accountAccessQuery.data?.total ?? 0;
+  const accountAccessPageCount = Math.max(1, Math.ceil(accountAccessTotal / ACCOUNT_ACCESS_PAGE_SIZE));
+  const accountAccessPageStart = accountAccessTotal === 0 ? 0 : (accountAccessPage - 1) * ACCOUNT_ACCESS_PAGE_SIZE + 1;
+  const accountAccessPageEnd = Math.min(accountAccessPage * ACCOUNT_ACCESS_PAGE_SIZE, accountAccessTotal);
+  const accountAccessPaginationItems = getPaginationItems(Math.min(accountAccessPage, accountAccessPageCount), accountAccessPageCount);
   const selectedLink = selectedId
     ? links.find((link) => link.id === selectedId) ?? (lastCreated?.id === selectedId ? lastCreated : null)
     : null;
@@ -653,6 +682,12 @@ export default function App() {
       setLinksPage(linksPageCount);
     }
   }, [linksPage, linksPageCount]);
+
+  useEffect(() => {
+    if (accountAccessPage > accountAccessPageCount) {
+      setAccountAccessPage(accountAccessPageCount);
+    }
+  }, [accountAccessPage, accountAccessPageCount]);
 
   const statsQuery = useQuery<AnalyticsStats>({
     queryKey: ["stats", token, analyticsSelection],
@@ -699,6 +734,12 @@ export default function App() {
         username: authForm.username.trim(),
         password: authForm.password
     }),
+    onError: async (error) => {
+      if (error instanceof ApiError && error.code === "registration_disabled") {
+        showToast(t.errorRegistrationDisabled);
+        await queryClient.invalidateQueries({ queryKey: ["config"] });
+      }
+    },
     onSuccess: async () => {
       const shouldCreate = pendingCreateAfterAuth;
       setAuthForm(emptyAuthForm);
@@ -823,6 +864,14 @@ export default function App() {
     }
   });
 
+  const accountAccessMutation = useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => updateUser(token, id, { isActive }),
+    onSuccess: async (user) => {
+      showToast(user.isActive ? t.toastAccountEnabled(user.username) : t.toastAccountDisabled(user.username));
+      await queryClient.invalidateQueries({ queryKey: ["users"] });
+    }
+  });
+
   const deleteUserMutation = useMutation({
     mutationFn: (id: string) => deleteUserRequest(token, id),
     onSuccess: async (user) => {
@@ -860,14 +909,23 @@ export default function App() {
   });
 
   const siteSettingsMutation = useMutation({
-    mutationFn: () => updateSiteSettings(token, siteSettingsForm),
+    mutationFn: () => {
+      const { registrationEnabled, ...settings } = siteSettingsForm;
+      return updateSiteSettings(token, {
+        ...settings,
+        ...(registrationEnabled !== savedRegistrationEnabledRef.current ? { registrationEnabled } : {})
+      });
+    },
     onSuccess: async (settings) => {
+      savedRegistrationEnabledRef.current = settings.registrationEnabled;
+      registrationEnabledDirtyRef.current = false;
       setSiteSettingsForm({
         siteName: settings.siteName,
         seoTitle: settings.seoTitle,
         seoDescription: settings.seoDescription,
         seoKeywords: settings.seoKeywords,
         analyticsCode: settings.analyticsCode,
+        registrationEnabled: settings.registrationEnabled,
         redirectAnalyticsEnabled: settings.redirectAnalyticsEnabled
       });
       showToast(t.toastSiteSettingsSaved);
@@ -1060,7 +1118,7 @@ export default function App() {
   function handleAuthSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (authMode === "login" || configQuery.data?.allowRegistration === false) {
+    if (authMode === "login" || configQuery.data?.allowRegistration !== true) {
       loginMutation.mutate();
       return;
     }
@@ -1089,7 +1147,7 @@ export default function App() {
     createMutation.reset();
     loginMutation.reset();
     registerMutation.reset();
-    setAuthMode(configQuery.data?.allowRegistration === false ? "login" : "register");
+    setAuthMode(configQuery.data?.allowRegistration === true ? "register" : "login");
     setPendingCreateAfterAuth(true);
     setAuthModalOpen(true);
   }
@@ -1097,7 +1155,7 @@ export default function App() {
   function openAuthModal(mode: AuthMode) {
     loginMutation.reset();
     registerMutation.reset();
-    setAuthMode(mode);
+    setAuthMode(mode === "register" && configQuery.data?.allowRegistration !== true ? "login" : mode);
     setPendingCreateAfterAuth(false);
     setAuthModalOpen(true);
   }
@@ -1317,7 +1375,7 @@ export default function App() {
   }
 
   function renderAuthView() {
-    const registrationAllowed = configQuery.data?.allowRegistration ?? true;
+    const registrationAllowed = configQuery.data?.allowRegistration === true;
     const isRegister = authMode === "register" && registrationAllowed;
     const mutation = isRegister ? registerMutation : loginMutation;
     const error = mutation.error ? getErrorMessage(mutation.error, t.fallbackError, t) : null;
@@ -1394,7 +1452,7 @@ export default function App() {
       return null;
     }
 
-    const registrationAllowed = configQuery.data?.allowRegistration ?? true;
+    const registrationAllowed = configQuery.data?.allowRegistration === true;
     const isRegister = authMode === "register" && registrationAllowed;
     const mutation = isRegister ? registerMutation : loginMutation;
     const error = mutation.error ? getErrorMessage(mutation.error, t.fallbackError, t) : null;
@@ -2486,6 +2544,116 @@ export default function App() {
     );
   }
 
+  function renderAccountAccessSettings() {
+    const manageableUsers = (accountAccessQuery.data?.items ?? []).filter((user) => user.id !== currentUser?.id);
+    const pendingUserId = accountAccessMutation.variables?.id;
+
+    return (
+      <section className="account-access-settings" aria-labelledby="account-access-title">
+        <div className="account-access-header">
+          <div>
+            <h3 id="account-access-title">{t.accountAccessTitle}</h3>
+            <p>{t.accountAccessHelp}</p>
+          </div>
+          <label className="search-field account-access-search">
+            <Search size={16} />
+            <input
+              autoComplete="off"
+              name="tokurl-account-access-search"
+              type="search"
+              value={accountAccessSearch}
+              onChange={(event) => setAccountAccessSearch(event.target.value)}
+              placeholder={t.searchAccountAccess}
+            />
+          </label>
+        </div>
+
+        {accountAccessQuery.isLoading ? (
+          <div className="empty-state account-access-state">
+            <Loader2 size={20} className="spin" />
+            {t.loading}
+          </div>
+        ) : accountAccessQuery.error ? (
+          <div className="empty-state error-state account-access-state">
+            {getErrorMessage(accountAccessQuery.error, t.fallbackError, t)}
+          </div>
+        ) : (
+          <>
+            {manageableUsers.length === 0 ? (
+              <div className="empty-state account-access-state">{t.noManageableUsers}</div>
+            ) : (
+              <div className="account-access-list">
+                {manageableUsers.map((user) => {
+                  const isPending = accountAccessMutation.isPending && pendingUserId === user.id;
+                  return (
+                    <div className="account-access-row" key={user.id} data-testid={`account-access-${user.id}`}>
+                      <div className="user-cell">
+                        <span className="user-avatar" aria-hidden="true">
+                          {user.username.trim().charAt(0).toUpperCase()}
+                        </span>
+                        <span className="user-identity">
+                          <strong title={user.username}>{user.username}</strong>
+                          <small>{user.role === "admin" ? t.roleAdmin : t.roleUser}</small>
+                        </span>
+                      </div>
+                      <div className="account-access-actions">
+                        <span className={`pill ${user.isActive ? "green" : "gray"}`}>
+                          {user.isActive ? t.accountEnabled : t.accountDisabled}
+                        </span>
+                        <button
+                          className={`btn compact ${user.isActive ? "danger" : "ghost"}`}
+                          type="button"
+                          disabled={accountAccessMutation.isPending}
+                          onClick={() => accountAccessMutation.mutate({ id: user.id, isActive: !user.isActive })}
+                        >
+                          {isPending ? <Loader2 size={16} className="spin" /> : user.isActive ? <Power size={16} /> : <Check size={16} />}
+                          {user.isActive ? t.disableAccount : t.enableAccount}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {accountAccessPageCount > 1 ? (
+              <div className="pagination-bar account-access-pagination">
+                <span>{t.paginationSummary(formatNumber(accountAccessPageStart, locale), formatNumber(accountAccessPageEnd, locale), formatNumber(accountAccessTotal, locale))}</span>
+                <div className="pagination-controls" aria-label={t.accountAccessPaginationLabel}>
+                  <button className="icon-btn" type="button" title={t.previousPage} disabled={accountAccessPage <= 1} onClick={() => setAccountAccessPage((page) => Math.max(1, page - 1))}>
+                    <ChevronLeft size={16} />
+                  </button>
+                  {accountAccessPaginationItems.map((item) =>
+                    typeof item === "number" ? (
+                      <button
+                        key={item}
+                        className={`page-btn ${accountAccessPage === item ? "active" : ""}`}
+                        type="button"
+                        aria-current={accountAccessPage === item ? "page" : undefined}
+                        onClick={() => setAccountAccessPage(item)}
+                      >
+                        {formatNumber(item, locale)}
+                      </button>
+                    ) : (
+                      <span className="pagination-ellipsis" key={item}>...</span>
+                    )
+                  )}
+                  <button className="icon-btn" type="button" title={t.nextPage} disabled={accountAccessPage >= accountAccessPageCount} onClick={() => setAccountAccessPage((page) => Math.min(accountAccessPageCount, page + 1))}>
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </>
+        )}
+
+        {accountAccessMutation.error ? (
+          <p className="form-error">{getErrorMessage(accountAccessMutation.error, t.fallbackError, t)}</p>
+        ) : null}
+        <p className="account-access-note">{t.accountAccessSelfProtected}</p>
+      </section>
+    );
+  }
+
   function renderSettingsPanel() {
     const apiBase = configQuery.data?.shortBaseUrl ?? "http://localhost:8080";
     const createExample = `curl -X POST ${apiBase}/api/links \\
@@ -2498,12 +2666,32 @@ docker compose up --build`;
 
     if (settingsTab === "site") {
       return (
-        <form className="settings-panel" onSubmit={handleSiteSettingsSubmit}>
-          <div className="panel-title">
-            <FileText size={20} />
-            <h2>{t.settingsSite}</h2>
-          </div>
-          <div className="site-settings-form">
+        <div className="settings-panel">
+          <form className="site-settings-section" onSubmit={handleSiteSettingsSubmit}>
+            <div className="panel-title">
+              <FileText size={20} />
+              <h2>{t.settingsSite}</h2>
+            </div>
+            <div className="site-settings-form">
+            <div className="field block-field registration-settings-field">
+              <label className="switch-line" htmlFor="site-settings-registration">
+                <input
+                  id="site-settings-registration"
+                  type="checkbox"
+                  checked={siteSettingsForm.registrationEnabled}
+                  onChange={(event) => {
+                    registrationEnabledDirtyRef.current = true;
+                    setSiteSettingsForm((current) => ({ ...current, registrationEnabled: event.target.checked }));
+                  }}
+                  aria-describedby="site-settings-registration-help"
+                />
+                <span>{t.registrationEnabledLabel}</span>
+              </label>
+              <small id="site-settings-registration-help">{t.registrationEnabledHelp}</small>
+              {configQuery.data?.siteSettings.registrationEnabled && !configQuery.data.allowRegistration ? (
+                <small>{t.registrationServerDisabled}</small>
+              ) : null}
+            </div>
             <label className="field block-field" htmlFor="site-settings-name">
               <span>{t.siteNameLabel}</span>
               <input
@@ -2575,15 +2763,17 @@ docker compose up --build`;
               </label>
               <small>{t.redirectAnalyticsEnabledHelp}</small>
             </div>
-          </div>
-          {siteSettingsMutation.error ? <p className="form-error">{getErrorMessage(siteSettingsMutation.error, t.fallbackError, t)}</p> : null}
-          <div className="settings-actions">
-            <button className="btn primary" type="submit" disabled={siteSettingsMutation.isPending}>
-              {siteSettingsMutation.isPending ? <Loader2 size={17} className="spin" /> : <Save size={17} />}
-              {t.saveSiteSettings}
-            </button>
-          </div>
-        </form>
+            </div>
+            {siteSettingsMutation.error ? <p className="form-error">{getErrorMessage(siteSettingsMutation.error, t.fallbackError, t)}</p> : null}
+            <div className="settings-actions">
+              <button className="btn primary" type="submit" disabled={siteSettingsMutation.isPending}>
+                {siteSettingsMutation.isPending ? <Loader2 size={17} className="spin" /> : <Save size={17} />}
+                {t.saveSiteSettings}
+              </button>
+            </div>
+          </form>
+          {renderAccountAccessSettings()}
+        </div>
       );
     }
 
@@ -2948,9 +3138,11 @@ docker compose up --build`;
                 <button className="btn ghost compact" type="button" onClick={() => openAuthModal("login")}>
                   {t.guestSignIn}
                 </button>
-                <button className="btn primary compact" type="button" onClick={() => openAuthModal("register")}>
-                  {t.guestRegister}
-                </button>
+                {configQuery.data?.allowRegistration === true ? (
+                  <button className="btn primary compact" type="button" onClick={() => openAuthModal("register")}>
+                    {t.guestRegister}
+                  </button>
+                ) : null}
               </div>
             )}
           </div>

@@ -25,6 +25,11 @@ interface SessionPayload {
   email: string;
   username?: string;
   role: UserRole;
+  sessionVersion?: number;
+}
+
+export interface VerifiedSession extends AuthUser {
+  sessionVersion: number;
 }
 
 interface AuthGuardContext {
@@ -64,8 +69,8 @@ export async function verifyPassword(passwordHash: string, password: string): Pr
   }
 }
 
-export async function signSession(user: AuthUser, secret: string): Promise<string> {
-  return new SignJWT({ email: user.email, username: user.username, role: user.role } satisfies SessionPayload)
+export async function signSession(user: AuthUser, secret: string, sessionVersion = 0): Promise<string> {
+  return new SignJWT({ email: user.email, username: user.username, role: user.role, sessionVersion } satisfies SessionPayload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuer(sessionIssuer)
     .setSubject(user.id)
@@ -74,12 +79,19 @@ export async function signSession(user: AuthUser, secret: string): Promise<strin
     .sign(getSessionKey(secret));
 }
 
-export async function verifySession(token: string, secret: string): Promise<AuthUser> {
+export async function verifySession(token: string, secret: string): Promise<VerifiedSession> {
   const { payload } = await jwtVerify<SessionPayload>(token, getSessionKey(secret), {
     issuer: sessionIssuer
   });
 
-  if (!payload.sub || !payload.email || (payload.role !== "admin" && payload.role !== "user")) {
+  const sessionVersion = payload.sessionVersion ?? 0;
+  if (
+    !payload.sub
+    || !payload.email
+    || (payload.role !== "admin" && payload.role !== "user")
+    || !Number.isSafeInteger(sessionVersion)
+    || sessionVersion < 0
+  ) {
     throw new Error("Invalid TokURL session payload.");
   }
 
@@ -87,7 +99,8 @@ export async function verifySession(token: string, secret: string): Promise<Auth
     id: payload.sub,
     email: payload.email,
     username: payload.username ?? usernameFromIdentifier(payload.email),
-    role: payload.role
+    role: payload.role,
+    sessionVersion
   };
 }
 
@@ -113,14 +126,14 @@ export function canAccessOwnedResource(user: AuthUser, ownerId: string | null | 
   return user.role === "admin" || Boolean(ownerId && ownerId === user.id);
 }
 
-async function getActiveUser(db: DbClient, id: string): Promise<AuthUser | null> {
+async function getActiveUser(db: DbClient, id: string, sessionVersion: number): Promise<AuthUser | null> {
   const [user] = await db
     .select()
     .from(users)
     .where(and(eq(users.id, id), eq(users.isActive, true)))
     .limit(1);
 
-  if (!user) {
+  if (!user || user.sessionVersion !== sessionVersion) {
     return null;
   }
 
@@ -153,27 +166,31 @@ async function getFirstActiveAdmin(db: DbClient): Promise<AuthUser | null> {
 
 export function createAuthGuard(context: AuthGuardContext) {
   return async function authGuard(request: FastifyRequest, reply: FastifyReply) {
-    const authorization = request.headers.authorization ?? "";
-
-    if (context.config.adminToken && authorization === `Bearer ${context.config.adminToken}`) {
-      const admin = await getFirstActiveAdmin(context.db);
-      if (admin) {
-        request.currentUser = admin;
-        return;
-      }
-    }
-
     const sessionToken = request.cookies?.[sessionCookieName];
     if (sessionToken) {
       try {
         const session = await verifySession(sessionToken, context.config.authSecret);
-        const activeUser = await getActiveUser(context.db, session.id);
+        const activeUser = await getActiveUser(context.db, session.id, session.sessionVersion);
         if (activeUser) {
           request.currentUser = activeUser;
           return;
         }
       } catch {
-        // Fall through to the uniform unauthorized response.
+        // Return the uniform unauthorized response below.
+      }
+
+      return reply.status(401).send({
+        error: "Unauthorized",
+        message: "A valid TokURL session is required."
+      });
+    }
+
+    const authorization = request.headers.authorization ?? "";
+    if (context.config.adminToken && authorization === `Bearer ${context.config.adminToken}`) {
+      const admin = await getFirstActiveAdmin(context.db);
+      if (admin) {
+        request.currentUser = admin;
+        return;
       }
     }
 

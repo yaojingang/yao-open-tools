@@ -121,7 +121,7 @@ curl -b tokurl.cookies -X POST http://localhost:8080/api/links \
 | `TOKURL_AUTH_SECRET` | dev value | Secret used to sign session cookies. Change in production. |
 | `TOKURL_BOOTSTRAP_ADMIN_EMAIL` | `admin@tokurl.local` | Internal identifier for the first super admin. The default login username is `admin`; the variable is kept for existing deployments. |
 | `TOKURL_BOOTSTRAP_ADMIN_PASSWORD` | `tokurl-admin` | Password for the first super admin. Change in production. |
-| `TOKURL_ALLOW_REGISTRATION` | `true` | Allows ordinary users to self-register. |
+| `TOKURL_ALLOW_REGISTRATION` | `true` | Server-level registration switch. Setting `false` disables public sign-up regardless of the admin setting. |
 | `TOKURL_COOKIE_SECURE` | `false` | Set to `true` when serving HTTPS. |
 | `TOKURL_TITLE_FETCH_TIMEOUT_MS` | `1200` | Best-effort page title fetch timeout during link creation. |
 | `TOKURL_TITLE_FETCH_MAX_BYTES` | `131072` | Maximum HTML bytes read while extracting the page title. |
@@ -144,3 +144,11 @@ Generated slugs use base62 and default to five characters. That keeps URLs short
 - `TOKURL_ADMIN_TOKEN` keeps simple server-to-server automation possible without forcing browser login.
 - Database migrations are plain SQL files in `apps/api/drizzle`.
 - The redirect behavior, base URL, slug length, cache TTL, and analytics switch are environment-driven.
+
+## Public registration
+
+Admins can toggle **Allow public registration** in **Settings → Website**, then save website settings. The change takes effect without restarting the service. Closing registration hides sign-up entries and rejects `POST /api/auth/register` with `403 registration_disabled`. Existing users can sign in and admins can still create users.
+
+The **Account access** section on the same page lets admins browse or search existing accounts and disable or re-enable them. Disabling an account invalidates its active session on the next request and blocks further sign-ins; after it is enabled again, the user must sign in again. The signed-in admin is hidden from this shortcut list to prevent accidental lockout.
+
+Registration is enabled by default. Both the website setting and `TOKURL_ALLOW_REGISTRATION` must allow it. The setting is stored in the database; apply migrations (`npm run db:migrate`) before starting the updated API. Docker Compose applies migrations automatically at API startup.

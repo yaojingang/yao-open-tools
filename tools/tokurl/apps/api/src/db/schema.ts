@@ -20,6 +20,7 @@ export const users = pgTable(
     passwordHash: text("password_hash").notNull(),
     role: varchar("role", { length: 16 }).notNull().default("user"),
     isActive: boolean("is_active").notNull().default(true),
+    sessionVersion: integer("session_version").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     lastLoginAt: timestamp("last_login_at", { withTimezone: true })
@@ -77,6 +78,7 @@ export const siteSettings = pgTable("site_settings", {
   seoDescription: text("seo_description").notNull(),
   seoKeywords: text("seo_keywords").notNull(),
   analyticsCode: text("analytics_code").notNull().default(""),
+  registrationEnabled: boolean("registration_enabled").notNull().default(true),
   redirectAnalyticsEnabled: boolean("redirect_analytics_enabled").notNull().default(false),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
 });

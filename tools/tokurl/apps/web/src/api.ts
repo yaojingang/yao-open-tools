@@ -144,12 +144,20 @@ export function getLinkStats(token: string, id: string): Promise<LinkStats> {
   return request<LinkStats>(`/api/links/${id}/stats`, token);
 }
 
-export function listUsers(token: string, search = ""): Promise<UserListResponse> {
+export function listUsers(
+  token: string,
+  search = "",
+  pagination: { limit?: number; offset?: number; excludeCurrentUser?: boolean } = {}
+): Promise<UserListResponse> {
   const params = new URLSearchParams();
   if (search.trim()) {
     params.set("search", search.trim());
   }
-  params.set("limit", "100");
+  params.set("limit", String(pagination.limit ?? 100));
+  params.set("offset", String(pagination.offset ?? 0));
+  if (pagination.excludeCurrentUser) {
+    params.set("excludeCurrentUser", "true");
+  }
 
   return request<UserListResponse>(`/api/users?${params.toString()}`, token);
 }
