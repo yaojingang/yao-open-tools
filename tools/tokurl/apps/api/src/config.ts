@@ -23,7 +23,7 @@ const envSchema = z.object({
   TOKURL_AUTH_SECRET: z.string().default("tokurl-dev-auth-secret-change-before-production"),
   TOKURL_BOOTSTRAP_ADMIN_EMAIL: z.string().email().default("admin@tokurl.local"),
   TOKURL_BOOTSTRAP_ADMIN_PASSWORD: z.string().default("tokurl-admin"),
-  TOKURL_ALLOW_REGISTRATION: z.coerce.boolean().default(true),
+  TOKURL_ALLOW_REGISTRATION: z.enum(["true", "false"]).default("true").transform((value) => value === "true"),
   TOKURL_COOKIE_SECURE: z.coerce.boolean().default(false),
   TOKURL_TITLE_FETCH_TIMEOUT_MS: z.coerce.number().int().min(100).max(10_000).default(1200),
   TOKURL_TITLE_FETCH_MAX_BYTES: z.coerce.number().int().min(1024).max(1_048_576).default(131_072),

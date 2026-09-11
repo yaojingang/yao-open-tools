@@ -1818,6 +1818,11 @@ tbody tr.selected-row {
   gap: 20px;
 }
 
+.site-settings-section {
+  display: grid;
+  gap: 20px;
+}
+
 .site-settings-form {
   display: grid;
   gap: 2px;
@@ -1830,6 +1835,7 @@ tbody tr.selected-row {
   line-height: 1.55;
 }
 
+.registration-settings-field small,
 .analytics-code-field small {
   margin-top: -8px;
   color: var(--text-3);
@@ -1848,6 +1854,85 @@ tbody tr.selected-row {
   justify-content: flex-end;
   border-top: 1px solid var(--border);
   padding-top: 18px;
+}
+
+.account-access-settings {
+  display: grid;
+  gap: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 22px;
+}
+
+.account-access-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.account-access-header > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.account-access-header h3,
+.account-access-header p,
+.account-access-note {
+  margin: 0;
+}
+
+.account-access-header h3 {
+  font-size: 16px;
+}
+
+.account-access-header p,
+.account-access-note {
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.55;
+}
+
+.account-access-search {
+  flex: 0 1 300px;
+}
+
+.account-access-list {
+  display: grid;
+  max-height: 368px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.account-access-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.account-access-row:last-child {
+  border-bottom: 0;
+}
+
+.account-access-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.account-access-actions .btn {
+  min-width: 118px;
+  min-height: 40px;
+}
+
+.account-access-state {
+  min-height: 92px;
 }
 
 .setting-rows {
@@ -2589,6 +2674,25 @@ tbody tr.selected-row {
   .setting-rows div {
     grid-template-columns: 1fr;
     gap: 4px;
+  }
+
+  .account-access-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .account-access-search {
+    flex-basis: auto;
+    width: 100%;
+  }
+
+  .account-access-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .account-access-actions {
+    justify-content: space-between;
   }
 
   .nav-right .status-badge {

@@ -131,7 +131,7 @@ curl -b tokurl.cookies -X POST http://localhost:8080/api/links \
 | `TOKURL_AUTH_SECRET` | 开发默认值 | session cookie 签名密钥，生产环境必须修改。 |
 | `TOKURL_BOOTSTRAP_ADMIN_EMAIL` | `admin@tokurl.local` | 首个超级管理员的内部标识。默认登录用户名是 `admin`，该变量保留给既有部署使用。 |
 | `TOKURL_BOOTSTRAP_ADMIN_PASSWORD` | `tokurl-admin` | 首个超级管理员密码，生产环境必须修改。 |
-| `TOKURL_ALLOW_REGISTRATION` | `true` | 是否允许普通用户自行注册。 |
+| `TOKURL_ALLOW_REGISTRATION` | `true` | 服务器注册总开关。设为 `false` 时始终关闭对外注册，管理员设置无法覆盖。 |
 | `TOKURL_COOKIE_SECURE` | `false` | HTTPS 部署时请设为 `true`。 |
 | `TOKURL_TITLE_FETCH_TIMEOUT_MS` | `1200` | 创建短链时抓取页面标题的超时时间。 |
 | `TOKURL_TITLE_FETCH_MAX_BYTES` | `131072` | 提取页面标题时最多读取的 HTML 字节数。 |
@@ -154,3 +154,11 @@ curl -b tokurl.cookies -X POST http://localhost:8080/api/links \
 - `TOKURL_ADMIN_TOKEN` 保留简单的服务端自动化入口，不强制浏览器登录。
 - 数据库迁移使用 `apps/api/drizzle` 下的普通 SQL 文件。
 - 跳转行为、短链基础地址、短码长度、缓存时间和统计开关都可以通过环境变量配置。
+
+## 对外注册控制
+
+管理员可进入 **设置 → 网站设置**，调整 **允许对外注册**，点击“保存网站设置”后生效，无需重启服务。关闭后，页面隐藏注册入口，`POST /api/auth/register` 返回 `403 registration_disabled`。已有账号仍可登录，管理员仍可创建用户。
+
+同一页面的 **账号使用权限** 支持分页浏览、按用户名搜索现有账号，并直接禁用或重新启用。账号被禁用后，现有会话的下一次请求会失效，登录接口也会拒绝该账号；重新启用后需要重新登录。当前登录的管理员账号不会出现在这个快捷列表中，避免误操作导致自己退出。
+
+注册默认开启，同时受网站设置和 `TOKURL_ALLOW_REGISTRATION` 控制，两者均开启时才允许注册。设置保存在数据库中；更新 API 前请执行数据库迁移（`npm run db:migrate`）。Docker Compose 会在 API 启动时自动执行迁移。

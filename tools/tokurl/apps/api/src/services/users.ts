@@ -1,10 +1,12 @@
-import { and, count, desc, eq, ilike, inArray, isNull, ne, or } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { AppConfig } from "../config.js";
 import type { DbClient } from "../db/client.js";
+import { activeAdminLockKey, registrationLockKey, withAdvisoryTransactionLock } from "../db/locks.js";
 import { links, users, type NewUserRecord, type UserRecord } from "../db/schema.js";
 import { ServiceError, isUniqueViolation } from "../utils/errors.js";
-import { type AuthUser, canManageUsers, hashPassword, verifyPassword, type UserRole } from "./auth.js";
+import { type AuthUser, canManageUsers, hashPassword, verifyPassword, type UserRole, type VerifiedSession } from "./auth.js";
+import { assertRegistrationAllowed } from "./settings.js";
 
 const usernamePattern = /^[\p{L}\p{N}._-]+$/u;
 const legacyLocalDomain = "@tokurl.local";
@@ -175,13 +177,13 @@ export async function getActiveUserById(services: UserServices, id: string): Pro
   return user ?? null;
 }
 
-async function insertUser(services: UserServices, input: CreateUserInput): Promise<UserRecord> {
+async function insertUser(services: UserServices, input: CreateUserInput, preparedPasswordHash?: string): Promise<UserRecord> {
   const now = new Date();
   const username = normalizeUsername(input.username);
   const values: NewUserRecord = {
     email: username,
     name: null,
-    passwordHash: await hashPassword(input.password),
+    passwordHash: preparedPasswordHash ?? await hashPassword(input.password),
     role: input.role,
     isActive: input.isActive ?? true,
     createdAt: now,
@@ -209,22 +211,26 @@ async function insertUser(services: UserServices, input: CreateUserInput): Promi
 }
 
 export async function registerUser(services: UserServices, input: RegisterInput) {
-  if (!services.config.allowRegistration) {
-    throw new ServiceError(403, "Registration is disabled.", "registration_disabled");
-  }
+  await assertRegistrationAllowed(services);
+  const passwordHash = await hashPassword(input.password);
 
-  const user = await insertUser(services, { ...input, role: "user", isActive: true });
-  return {
-    user: toPublicUser(user),
-    authUser: toAuthUser(user)
-  };
+  return withAdvisoryTransactionLock(services.db, registrationLockKey, async (db) => {
+    const lockedServices = { ...services, db };
+    await assertRegistrationAllowed(lockedServices);
+    const user = await insertUser(lockedServices, { ...input, role: "user", isActive: true }, passwordHash);
+    return {
+      user: toPublicUser(user),
+      authUser: toAuthUser(user),
+      sessionVersion: user.sessionVersion
+    };
+  });
 }
 
 export async function createUser(services: UserServices, input: CreateUserInput) {
   return toPublicUser(await insertUser(services, input));
 }
 
-export async function loginUser(services: UserServices, input: LoginInput): Promise<AuthUser> {
+export async function loginUser(services: UserServices, input: LoginInput): Promise<VerifiedSession> {
   const [user] = await services.db
     .select()
     .from(users)
@@ -235,11 +241,25 @@ export async function loginUser(services: UserServices, input: LoginInput): Prom
     throw new ServiceError(401, "Username or password is incorrect.", "invalid_credentials");
   }
 
-  await services.db.update(users).set({ lastLoginAt: new Date(), updatedAt: new Date() }).where(eq(users.id, user.id));
-  return toAuthUser(user);
+  const now = new Date();
+  const [current] = await services.db
+    .update(users)
+    .set({ lastLoginAt: now, updatedAt: now })
+    .where(and(eq(users.id, user.id), eq(users.isActive, true), eq(users.sessionVersion, user.sessionVersion)))
+    .returning();
+
+  if (!current) {
+    throw new ServiceError(401, "Username or password is incorrect.", "invalid_credentials");
+  }
+
+  return { ...toAuthUser(current), sessionVersion: current.sessionVersion };
 }
 
-export async function listUsers(services: UserServices, query: { search?: string; limit?: number; offset?: number }, viewer: AuthUser) {
+export async function listUsers(
+  services: UserServices,
+  query: { search?: string; limit?: number; offset?: number; excludeCurrentUser?: boolean },
+  viewer: AuthUser
+) {
   const limit = Math.min(Math.max(query.limit ?? 50, 1), 100);
   const offset = Math.max(query.offset ?? 0, 0);
   const search = query.search?.trim();
@@ -247,7 +267,9 @@ export async function listUsers(services: UserServices, query: { search?: string
     ? or(ilike(users.email, `%${search}%`), ilike(users.name, `%${search}%`), ilike(users.role, `%${search}%`))
     : undefined;
   const visibilityClause = canManageUsers(viewer) ? undefined : eq(users.id, viewer.id);
-  const whereClause = searchClause && visibilityClause ? and(searchClause, visibilityClause) : (searchClause ?? visibilityClause);
+  const exclusionClause = query.excludeCurrentUser ? ne(users.id, viewer.id) : undefined;
+  const viewerClause = visibilityClause && exclusionClause ? and(visibilityClause, exclusionClause) : (visibilityClause ?? exclusionClause);
+  const whereClause = searchClause && viewerClause ? and(searchClause, viewerClause) : (searchClause ?? viewerClause);
 
   const [items, totalRows] = await Promise.all([
     services.db.select().from(users).where(whereClause).orderBy(desc(users.createdAt)).limit(limit).offset(offset),
@@ -294,7 +316,7 @@ async function wouldDeleteLastActiveAdmin(services: UserServices, id: string, ta
   return (summary?.total ?? 0) === 0;
 }
 
-export async function updateUser(services: UserServices, id: string, input: UpdateUserInput) {
+async function updateUserRecord(services: UserServices, id: string, input: UpdateUserInput) {
   if (await wouldRemoveLastAdmin(services, id, input)) {
     throw new ServiceError(400, "At least one active admin user is required.", "last_admin");
   }
@@ -326,12 +348,27 @@ export async function updateUser(services: UserServices, id: string, input: Upda
     updates.isActive = input.isActive;
   }
 
-  const [updated] = await services.db.update(users).set(updates).where(eq(users.id, id)).returning();
+  const [updated] = await services.db
+    .update(users)
+    .set({
+      ...updates,
+      ...(input.isActive === false ? { sessionVersion: sql`${users.sessionVersion} + 1` } : {})
+    })
+    .where(eq(users.id, id))
+    .returning();
   if (!updated) {
     throw new ServiceError(404, "User was not found.", "not_found");
   }
 
   return toPublicUser(updated);
+}
+
+export async function updateUser(services: UserServices, id: string, input: UpdateUserInput) {
+  if (input.role === "user" || input.isActive === false) {
+    return withAdvisoryTransactionLock(services.db, activeAdminLockKey, (db) => updateUserRecord({ ...services, db }, id, input));
+  }
+
+  return updateUserRecord(services, id, input);
 }
 
 export async function resetUserPassword(services: UserServices, id: string, input: ResetPasswordInput) {
@@ -351,7 +388,7 @@ export async function resetUserPassword(services: UserServices, id: string, inpu
   return toPublicUser(updated);
 }
 
-export async function deleteUser(services: UserServices, id: string, viewer: AuthUser) {
+async function deleteUserRecord(services: UserServices, id: string, viewer: AuthUser) {
   if (viewer.id === id) {
     throw new ServiceError(400, "Current user cannot delete their own account.", "self_delete_forbidden");
   }
@@ -372,6 +409,10 @@ export async function deleteUser(services: UserServices, id: string, viewer: Aut
   }
 
   return toPublicUser(deleted);
+}
+
+export async function deleteUser(services: UserServices, id: string, viewer: AuthUser) {
+  return withAdvisoryTransactionLock(services.db, activeAdminLockKey, (db) => deleteUserRecord({ ...services, db }, id, viewer));
 }
 
 export async function bulkDeleteUsers(services: UserServices, input: BulkDeleteUsersInput, viewer: AuthUser) {

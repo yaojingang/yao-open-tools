@@ -23,12 +23,17 @@ function createDbMock(options: { existing?: SiteSettingsRecord[]; returning?: Si
   const onConflictDoUpdate = vi.fn(() => ({ returning: returningMock }));
   const values = vi.fn(() => ({ onConflictDoUpdate }));
   const insert = vi.fn(() => ({ values }));
+  const execute = vi.fn(async () => []);
+  const transaction = vi.fn(async (operation: (transaction: DbClient) => Promise<unknown>) => operation(db));
+  const db = { select, insert, execute, transaction } as unknown as DbClient;
 
   return {
-    db: { select, insert } as unknown as DbClient,
+    db,
     mocks: {
       select,
       insert,
+      execute,
+      transaction,
       values,
       onConflictDoUpdate,
       returning: returningMock
@@ -63,11 +68,26 @@ describe("site settings service", () => {
       seoDescription: saved.seoDescription,
       seoKeywords: saved.seoKeywords,
       analyticsCode: saved.analyticsCode,
+      registrationEnabled: saved.registrationEnabled,
       redirectAnalyticsEnabled: saved.redirectAnalyticsEnabled,
       updatedAt: saved.updatedAt.toISOString()
     });
     expect(mocks.insert).toHaveBeenCalledTimes(1);
     expect(mocks.onConflictDoUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves a disabled registration flag and preserves it on unrelated patches", async () => {
+    const saved = settingsRecord({ registrationEnabled: false });
+    const { db, mocks } = createDbMock({ existing: [saved], returning: [saved] });
+
+    await expect(updateSiteSettings({ db }, { registrationEnabled: false })).resolves.toMatchObject({ registrationEnabled: false });
+    expect(mocks.onConflictDoUpdate).toHaveBeenLastCalledWith(expect.objectContaining({
+      set: { registrationEnabled: false, updatedAt: expect.any(Date) }
+    }));
+    await updateSiteSettings({ db }, { siteName: "Updated name" });
+    expect(mocks.onConflictDoUpdate).toHaveBeenLastCalledWith(expect.objectContaining({
+      set: { siteName: "Updated name", updatedAt: expect.any(Date) }
+    }));
   });
 
   it("throws a structured error when the database does not return the saved row", async () => {
@@ -84,6 +104,8 @@ describe("site settings service", () => {
     expect(() => updateSiteSettingsSchema.parse({})).toThrow();
     expect(() => updateSiteSettingsSchema.parse({ seoDescription: "x".repeat(301) })).toThrow();
     expect(() => updateSiteSettingsSchema.parse({ analyticsCode: "x".repeat(12_001) })).toThrow();
+    expect(updateSiteSettingsSchema.parse({ registrationEnabled: false }).registrationEnabled).toBe(false);
+    expect(() => updateSiteSettingsSchema.parse({ registrationEnabled: "false" })).toThrow();
     expect(updateSiteSettingsSchema.parse({ redirectAnalyticsEnabled: true }).redirectAnalyticsEnabled).toBe(true);
   });
 });

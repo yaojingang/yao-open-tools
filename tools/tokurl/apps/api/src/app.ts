@@ -49,15 +49,19 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     service: "tokurl-api"
   }));
 
-  app.get("/api/config", async () => ({
-    shortBaseUrl: config.publicShortBaseUrl,
-    slugLength: config.slugLength,
-    redirectStatus: config.redirectStatus,
-    adminAuthEnabled: true,
-    allowRegistration: config.allowRegistration,
-    analyticsEnabled: config.analyticsEnabled,
-    siteSettings: await getSiteSettings({ db })
-  }));
+  app.get("/api/config", async (_request, reply) => {
+    const siteSettings = await getSiteSettings({ db });
+    reply.header("Cache-Control", "no-store");
+    return {
+      shortBaseUrl: config.publicShortBaseUrl,
+      slugLength: config.slugLength,
+      redirectStatus: config.redirectStatus,
+      adminAuthEnabled: true,
+      allowRegistration: config.allowRegistration && siteSettings.registrationEnabled,
+      analyticsEnabled: config.analyticsEnabled,
+      siteSettings
+    };
+  });
 
   await registerAuthRoutes(app, { config, db, redis });
   await registerUserRoutes(app, { config, db });

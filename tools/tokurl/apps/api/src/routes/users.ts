@@ -27,7 +27,8 @@ interface RouteContext {
 const listQuerySchema = z.object({
   search: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
-  offset: z.coerce.number().int().min(0).optional()
+  offset: z.coerce.number().int().min(0).optional(),
+  excludeCurrentUser: z.enum(["true", "false"]).transform((value) => value === "true").optional()
 });
 
 const userParamsSchema = z.object({
